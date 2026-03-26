@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from datetime import timezone
 
 from app.db.models import MessageEnvelope
 from app.db.repositories.message_repository import MessageRepository
@@ -42,8 +43,14 @@ class MessageService:
         self.repo.acknowledge(str(request.messageID))
         return MessageAckResponse(acknowledged=True, messageID=request.messageID)
 
+    from datetime import timezone
+
     @staticmethod
     def _to_schema(envelope: MessageEnvelope) -> CiphertextEnvelope:
+        created_at = envelope.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+
         return CiphertextEnvelope(
             id=envelope.id,
             senderUserID=envelope.sender_user_id,
@@ -51,5 +58,5 @@ class MessageService:
             conversationID=envelope.conversation_id,
             ciphertext=envelope.ciphertext,
             header=envelope.header,
-            createdAt=envelope.created_at,
+            createdAt=created_at,
         )
