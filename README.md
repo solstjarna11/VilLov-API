@@ -5,6 +5,7 @@ Minimal FastAPI backend for the current VilLov Chat client stage.
 ## Scope
 
 Implemented:
+
 - stub passkey begin/finish flow
 - opaque bearer token issuance
 - authenticated key bundle lookup
@@ -14,6 +15,7 @@ Implemented:
 - seeded SQLite persistence
 
 Deliberately not implemented yet:
+
 - real WebAuthn / passkey verification
 - real end-to-end cryptography
 - real device linking
@@ -74,10 +76,12 @@ http://127.0.0.1:8000
 ## Auth behavior
 
 `POST /auth/passkey/begin`
+
 - accepts `{}`
 - always returns a fixed development challenge
 
 `POST /auth/passkey/finish`
+
 - accepts the client stub payload
 - does not verify cryptographically
 - returns a bearer token
@@ -165,7 +169,6 @@ curl -X POST http://127.0.0.1:8000/messages/ack \
 - UUIDs are returned as strings
 - authenticated endpoints require `Authorization: Bearer <token>`
 - the backend preserves `messageID` as the envelope id
-
 
 ## Conversation identity
 

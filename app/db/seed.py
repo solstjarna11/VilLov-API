@@ -8,7 +8,7 @@ from app.db.models import KeyBundle, TokenMapping, User
 SEEDED_USERS = [
     ("user_alice", "Alice Johnson"),
     ("user_bob", "Bob Smith"),
-    ("user_charlie", "Charlie Nguyen"),
+    ("user_charlie", "Charlie Brown"),
 ]
 
 
