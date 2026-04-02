@@ -22,8 +22,13 @@ class PasskeyBeginResponse(BaseModel):
 
 
 class PasskeyFinishRequest(BaseModel):
+    challenge: str
     credentialID: str
-    clientDataJSON: str
-    authenticatorData: str
-    signature: str
-    userHandle: Optional[str] = None
+    userHandle: str | None = None
+    deviceID: str | None = None
+    deviceName: str | None = None
+    platform: str | None = None
+    transports: str | None = None
+    clientDataJSON: str | None = None
+    authenticatorData: str | None = None
+    signature: str | None = None
