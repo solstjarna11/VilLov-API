@@ -1,6 +1,8 @@
 .DS_Store
 *.db
 
+plan/
+
 # Byte-compiled / optimized / DLL files
 # Ignore Python bytecode
 __pycache__/
