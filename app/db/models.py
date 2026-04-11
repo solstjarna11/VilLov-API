@@ -1,7 +1,7 @@
 from datetime import datetime, UTC
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, Integer
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
@@ -58,6 +58,9 @@ class AuthSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    user=relationship("User")
+    device=relationship("Device")
 
 class KeyBundle(Base):
     __tablename__ = "key_bundles"

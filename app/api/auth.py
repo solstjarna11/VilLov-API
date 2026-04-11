@@ -27,10 +27,15 @@ def passkey_register_finish(
     request: PasskeyFinishRequest,
     db: Session = Depends(get_db),
 ) -> SessionToken:
+    logger.info("auth register finish requested user_handle=%s credential_id=%s device_id=%s",
+                request.userHandle,
+                request.credentialID,
+                request.deviceID,)
     return AuthService(db).finish_register_passkey(request)
 
 @router.post("/passkey/login/begin", response_model=PasskeyBeginResponse)
 def passkey_login_begin(db: Session = Depends(get_db)) -> PasskeyBeginResponse:
+    logger.info("auth login begin requested")
     return AuthService(db).begin_login_passkey()
 
 @router.post("/passkey/login/finish", response_model=SessionToken)
@@ -38,15 +43,22 @@ def passkey_login_finish(
     request: PasskeyFinishRequest,
     db: Session = Depends(get_db),
 ) -> SessionToken:
+    logger.info("auth login finish requested user_handle=%s credential_id=%s device_id=%s",
+                request.userHandle,
+                request.credentialID,
+                request.deviceID,)
     return AuthService(db).finish_login_passkey(request)
 
 
 @router.post("/passkey/begin", response_model=PasskeyBeginResponse)
 def passkey_begin(db: Session = Depends(get_db)) -> PasskeyBeginResponse:
-    logger.info("passkey begin requested")
+    logger.info("legacy passkey begin requested")
     return AuthService(db).begin_passkey()
 
 @router.post("/passkey/finish")
 def passkey_finish(request: PasskeyFinishRequest, db: Annotated[Session, Depends(get_db)]) -> SessionToken:
-    logger.info("passkey finish requested for credential_id=%s", request.credentialID)
+    logger.info("legacy passkey finish requested for user_handle=%s credential_id=%s device_id=%s",
+                request.userHandle,
+                request.credentialID,
+                request.deviceID,)
     return AuthService(db).finish_passkey(request)

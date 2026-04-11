@@ -1,4 +1,5 @@
 import secrets
+import logging
 from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -13,6 +14,7 @@ from app.schemas.auth import (
     SessionToken,
 )
 
+logger = logging.getLogger(__name__)
 
 class AuthService:
     def __init__(self, db: Session) -> None:
@@ -38,7 +40,9 @@ class AuthService:
             user_id=user_id,
             device_id=device_id,
         )
-
+        logger.info("auth register begin created user_id=%s device_id=%s flow=register",
+                    user_id,
+                    device_id,)
         return PasskeyBeginResponse(
             challenge=challenge,
             relyingPartyID=DEV_RP_ID,
@@ -57,7 +61,9 @@ class AuthService:
             user_id=user_id,
             device_id=device_id,
         )
-
+        logger.info("auth login begin created user_id=%s device_id=%s flow=login",
+                    user_id,
+                    device_id,)
         return PasskeyBeginResponse(
             challenge=challenge,
             relyingPartyID=DEV_RP_ID,
@@ -78,6 +84,9 @@ class AuthService:
 
         credential_id = request.credentialID
         if self.user_repo.get_credential(credential_id) is not None:
+            logger.info("auth register finish rejected reason=duplicate_credential user_id=%s credential_id=%s",
+            user_id,
+            credential_id,)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Credential already registered",
@@ -108,7 +117,10 @@ class AuthService:
         )
 
         self.user_repo.consume_challenge(challenge_row)
-
+        logger.info("auth register finish success user_id=%s device_id=%s credential_id=%s",
+            user_id,
+            device.device_id,
+            credential_id,)
         return SessionToken(accessToken=access_token, expiresAt=expires_at)
     
     def finish_login_passkey(self, request: PasskeyFinishRequest) -> SessionToken:
@@ -116,12 +128,17 @@ class AuthService:
 
         challenge_row = self.user_repo.get_active_challenge(request.challenge, "login")
         if challenge_row is None:
+            logger.info("auth register finish rejected = invalid_or_expired_challenge user_id=%s",
+                        user_id,)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired login challenge",
             )
 
         if challenge_row.user_id != user_id:
+            logger.info("auth register finish rejected = challenge_user_mismatch user_id=%s challenge_user_id=%s",
+                        user_id,
+                        challenge_row.user_id,)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Challenge does not belong to this user",
@@ -152,7 +169,11 @@ class AuthService:
         )
 
         self.user_repo.consume_challenge(challenge_row)
-
+        logger.info("auth login finish success user_id=%s device_id=%s credential_id=%s",
+            user_id,
+            device.device_id,
+            credential_id,
+)
         return SessionToken(accessToken=access_token, expiresAt=expires_at)
 
 

@@ -6,10 +6,12 @@ Minimal FastAPI backend for the current VilLov Chat client stage.
 
 Implemented:
 
-- stub passkey begin/finish flow
-- opaque bearer token issuance
+- passkey-style register/login flow with challenge validation
+- database-backed session management
+- bearer token authentication with session validation
+- public key upload and retrieval
+- ciphertext message relay with offline delivery
 - authenticated key bundle lookup
-- ciphertext message relay
 - inbox fetch
 - message acknowledgement
 - seeded SQLite persistence
@@ -75,17 +77,60 @@ http://127.0.0.1:8000
 
 ## Auth behavior
 
+The backend implements a simplified passkey (WebAuthn-style) flow.
+
+### Register
+1. Client requests a challenge (`/auth/passkey/register/begin`)
+2. Client responds with credential data (`/auth/passkey/register/finish`)
+3. Server stores public credential material and creates a session
+
+### Login
+1. Client requests a challenge (`/auth/passkey/login/begin`)
+2. Client signs challenge locally
+3. Server verifies challenge and credential existence
+4. Server creates a session and returns a bearer token
+
+### Sessions
+
+- Sessions are stored in the database
+- Each request validates:
+  - token existence
+  - expiration time
+  - revocation status
+
+Invalid, expired, or revoked tokens are rejected with `401 Unauthorized`.
+
 `POST /auth/passkey/begin`
 
 - accepts `{}`
-- always returns a fixed development challenge
+- returns a generated challenge stored on the server
+- used for development compatibility
 
 `POST /auth/passkey/finish`
 
-- accepts the client stub payload
-- does not verify cryptographically
-- returns a bearer token
-- defaults to `user_alice`, but if `userHandle` matches a seeded user it will return that user’s token
+- accepts client response with challenge and credential data
+- validates challenge and credential existence
+- does not perform real cryptographic verification (development mode)
+- returns a bearer token linked to a database session
+
+## Security Model
+
+The backend follows a strict end-to-end encryption architecture.
+
+Server:
+- stores only public keys and ciphertext
+- authenticates users
+- relays messages
+
+Client:
+- generates keys
+- encrypts messages
+- decrypts messages
+
+The server never:
+- stores private keys
+- decrypts messages
+- accesses plaintext content
 
 ## Supported endpoints
 

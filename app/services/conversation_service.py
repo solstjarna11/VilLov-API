@@ -28,3 +28,6 @@ class ConversationService:
         if conversation is not None:
             return conversation
         return self.repo.create(current_user_id, recipient_user_id)
+    
+    def list_conversations(self, current_user_id: str):
+        return self.repo.list_for_user(current_user_id)
