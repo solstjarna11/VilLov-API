@@ -12,7 +12,8 @@ class SessionToken(BaseModel):
 
 
 class PasskeyBeginRequest(BaseModel):
-    pass
+    userHandle: str | None = None
+    deviceID: str | None = None
 
 
 class PasskeyBeginResponse(BaseModel):

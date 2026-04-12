@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 
 from app.api.auth import router as auth_router
+from app.api.contacts import router as contacts_router
 from app.api.conversations import router as conversations_router
 from app.api.keys import router as keys_router
 from app.api.messages import router as messages_router
@@ -17,6 +18,7 @@ logging.basicConfig(
 
 app = FastAPI(title=API_TITLE, version=API_VERSION)
 app.include_router(auth_router)
+app.include_router(contacts_router)
 app.include_router(keys_router)
 app.include_router(conversations_router)
 app.include_router(messages_router)

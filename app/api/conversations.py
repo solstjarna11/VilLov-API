@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.dependencies.auth import get_current_user, AuthenticatedPrincipal
 from app.schemas.conversations import (
+    ConversationListItem,
     GetOrCreateConversationRequest,
     GetOrCreateConversationResponse,
 )
@@ -22,24 +23,30 @@ def get_or_create_conversation(
     db: Session = Depends(get_db),
 ) -> GetOrCreateConversationResponse:
     logger.info(
-        "conversation get-or-create current_user_id=%s recipient_user_id=%s",
+        "conversation get-or-create current_user_id=%s recipient_user_id=%s session_id=%s",
         principal.user_id,
         request.recipientUserID,
-        principal.session_id
+        principal.session_id,
     )
-    conversation = ConversationService(db).get_or_create(principal.user_id, request.recipientUserID)
+    conversation = ConversationService(db).get_or_create(
+        principal.user_id,
+        request.recipientUserID,
+    )
     return GetOrCreateConversationResponse(conversationID=conversation.id)
 
-@router.get("")
+
+@router.get("", response_model=list[ConversationListItem])
 def list_conversations(
     principal: AuthenticatedPrincipal = Depends(get_current_user),
-    db: Session = Depends(get_db),):
+    db: Session = Depends(get_db),
+) -> list[ConversationListItem]:
     conversations = ConversationService(db).list_conversations(principal.user_id)
-    return [{
-        "conversationID": conversation.id,
-        "participantAUserID": conversation.participant_a_user_id,
-        "participantBUserID": conversation.participant_b_user_id,
-        "createdAt": conversation.created_at,
-    }
-    for conversation in conversations
+    return [
+        ConversationListItem(
+            conversationID=conversation.id,
+            participantAUserID=conversation.participant_a_user_id,
+            participantBUserID=conversation.participant_b_user_id,
+            createdAt=conversation.created_at,
+        )
+        for conversation in conversations
     ]
