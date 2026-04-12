@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, or_
+from app.db.models import Conversation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -43,3 +44,8 @@ class ConversationRepository:
             return existing
         self.db.refresh(conversation)
         return conversation
+    
+    def list_for_user(self, user_id: str) -> list[Conversation]:
+        stmt = (select(Conversation).where(or_(Conversation.participant_a_user_id == user_id,
+                                               Conversation.participant_b_user_id == user_id,)).order_by(Conversation.created_at.desc()))
+        return list(self.db.scalars(stmt).all())

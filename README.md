@@ -6,12 +6,15 @@ Minimal FastAPI backend for the current VilLov Chat client stage.
 
 Implemented:
 
-- stub passkey begin/finish flow
-- opaque bearer token issuance
+- passkey-style register/login flow with challenge validation
+- database-backed session management
+- bearer token authentication with session validation
+- public key upload and retrieval
+- ciphertext message relay with offline delivery
 - authenticated key bundle lookup
-- ciphertext message relay
 - inbox fetch
 - message acknowledgement
+- contacts and conversation directory APIs
 - seeded SQLite persistence
 
 Deliberately not implemented yet:
@@ -75,51 +78,157 @@ http://127.0.0.1:8000
 
 ## Auth behavior
 
-`POST /auth/passkey/begin`
+The backend implements a simplified passkey (WebAuthn-style) flow.
 
-- accepts `{}`
-- always returns a fixed development challenge
+### Register
 
+1. Client requests a challenge (`/auth/passkey/register/begin`)
+   - accepts optional `userHandle` and `deviceID`
+2. Client responds with credential data (`/auth/passkey/register/finish`)
+3. Server stores public credential material and creates a session
+
+### Login
+
+1. Client requests a challenge (`/auth/passkey/login/begin`)
+   - accepts optional `userHandle` and `deviceID`
+   - defaults to `DEFAULT_SIGNIN_USER_ID` if omitted (dev behavior)
+2. Client signs challenge locally
+3. Server verifies challenge and credential existence
+4. Server creates a session and returns a bearer token
+
+### Sessions
+
+- Sessions are stored in the database
+- Each request validates:
+  - token existence
+  - expiration time
+  - revocation status
+
+Invalid, expired, or revoked tokens are rejected with `401 Unauthorized`.
+
+### Legacy endpoints (dev compatibility)
+
+`POST /auth/passkey/begin`  
 `POST /auth/passkey/finish`
 
-- accepts the client stub payload
-- does not verify cryptographically
-- returns a bearer token
-- defaults to `user_alice`, but if `userHandle` matches a seeded user it will return that user’s token
+These map to the login flow and are retained for compatibility.
+
+## Security Model
+
+The backend follows a strict end-to-end encryption architecture.
+
+Server:
+- stores only public keys and ciphertext
+- authenticates users
+- relays messages
+
+Client:
+- generates keys
+- encrypts messages
+- decrypts messages
+
+The server never:
+- stores private keys
+- decrypts messages
+- accesses plaintext content
 
 ## Supported endpoints
 
-- `POST /auth/passkey/begin`
-- `POST /auth/passkey/finish`
+### Auth
+
+- `POST /auth/passkey/login/begin`
+- `POST /auth/passkey/login/finish`
+- `POST /auth/passkey/register/begin`
+- `POST /auth/passkey/register/finish`
+
+### Contacts & Conversations
+
+- `GET /contacts`
+- `GET /conversations`
+- `POST /conversations/get-or-create`
+
+### Keys & Messaging
+
 - `GET /keys/{userID}/bundle`
 - `POST /keys/upload`
 - `POST /messages/send`
 - `GET /messages/inbox`
 - `POST /messages/ack`
+
+### Misc
+
 - `GET /health`
 
 ## Example requests
 
-### Begin sign-in
+### Begin login (Bob)
 
 ```bash
-curl -X POST http://127.0.0.1:8000/auth/passkey/begin \
-  -H 'Content-Type: application/json' \
-  -d '{}'
-```
-
-### Finish sign-in
-
-```bash
-curl -X POST http://127.0.0.1:8000/auth/passkey/finish \
+curl -X POST http://127.0.0.1:8000/auth/passkey/login/begin \
   -H 'Content-Type: application/json' \
   -d '{
-    "credentialID": "stub-credential",
+    "userHandle": "user_bob",
+    "deviceID": "device-user_bob-iphone"
+  }'
+```
+
+### Finish login
+
+```bash
+curl -X POST http://127.0.0.1:8000/auth/passkey/login/finish \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "credentialID": "credential-user_bob-primary",
     "clientDataJSON": "stub-client-data",
     "authenticatorData": "stub-auth-data",
     "signature": "stub-signature",
-    "userHandle": "user_alice"
+    "userHandle": "user_bob",
+    "deviceID": "device-user_bob-iphone"
   }'
+```
+
+### Fetch contacts
+
+```bash
+curl http://127.0.0.1:8000/contacts \
+  -H 'Authorization: Bearer dev-token-user_alice'
+```
+
+### Fetch conversations
+
+```bash
+curl http://127.0.0.1:8000/conversations \
+  -H 'Authorization: Bearer dev-token-user_alice'
+```
+
+Example response:
+
+```json
+[
+  {
+    "conversationID": "c31d58bf-ab98-4c75-8c82-900def70c8af",
+    "participantAUserID": "user_alice",
+    "participantBUserID": "user_bob",
+    "createdAt": "2026-04-12T22:21:09.043405Z"
+  }
+]
+```
+
+### Get or create conversation
+
+```bash
+curl -X POST http://127.0.0.1:8000/conversations/get-or-create \
+  -H "Authorization: Bearer dev-token-user_alice" \
+  -H "Content-Type: application/json" \
+  -d '{"recipientUserID":"user_bob"}'
+```
+
+Response:
+
+```json
+{
+  "conversationID": "<uuid>"
+}
 ```
 
 ### Fetch Bob's key bundle
@@ -145,14 +254,14 @@ curl -X POST http://127.0.0.1:8000/messages/send \
   }'
 ```
 
-### Fetch Bob's inbox
+### Fetch inbox
 
 ```bash
 curl http://127.0.0.1:8000/messages/inbox \
   -H 'Authorization: Bearer dev-token-user_bob'
 ```
 
-### Acknowledge a message as Bob
+### Acknowledge message
 
 ```bash
 curl -X POST http://127.0.0.1:8000/messages/ack \
@@ -165,32 +274,17 @@ curl -X POST http://127.0.0.1:8000/messages/ack \
 
 ## Notes for the Swift client
 
-- dates are ISO-8601 strings
+- dates are ISO-8601 UTC strings with `Z` suffix  
+  (e.g. `2026-04-12T22:21:09.043405Z`)
 - UUIDs are returned as strings
 - authenticated endpoints require `Authorization: Bearer <token>`
 - the backend preserves `messageID` as the envelope id
 
 ## Conversation identity
 
-Authenticated endpoint:
+The same `conversationID` is returned for both directions:
 
-- `POST /conversations/get-or-create`
+- Alice → Bob
+- Bob → Alice
 
-Example:
-
-```bash
-curl -X POST http://127.0.0.1:8000/conversations/get-or-create \
-  -H "Authorization: Bearer dev-token-user_alice" \
-  -H "Content-Type: application/json" \
-  -d '{"recipientUserID":"user_bob"}'
-```
-
-Response:
-
-```json
-{
-  "conversationID": "<uuid>"
-}
-```
-
-The same `conversationID` is returned for both Alice→Bob and Bob→Alice.
+This ensures a single shared conversation per user pair.
