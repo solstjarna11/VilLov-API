@@ -1,3 +1,5 @@
+# app/schemas/auth.py
+
 from datetime import datetime
 from typing import Optional
 
@@ -16,20 +18,45 @@ class PasskeyBeginRequest(BaseModel):
     deviceID: str | None = None
 
 
-class PasskeyBeginResponse(BaseModel):
+class PasskeyRegistrationBeginResponse(BaseModel):
+    challenge: str
+    relyingPartyID: str
+    userID: str
+    userName: str
+    displayName: str
+
+
+class PasskeyAssertionBeginResponse(BaseModel):
     challenge: str
     relyingPartyID: str
     userID: Optional[str] = None
 
 
-class PasskeyFinishRequest(BaseModel):
+class PasskeyRegistrationFinishRequest(BaseModel):
     challenge: str
     credentialID: str
     userHandle: str | None = None
     deviceID: str | None = None
     deviceName: str | None = None
     platform: str | None = None
-    transports: str | None = None
-    clientDataJSON: str | None = None
-    authenticatorData: str | None = None
-    signature: str | None = None
+    transports: list[str] | None = None
+    clientDataJSON: str
+    attestationObject: str
+
+
+class PasskeyAssertionFinishRequest(BaseModel):
+    challenge: str
+    credentialID: str
+    userHandle: str | None = None
+    deviceID: str | None = None
+    deviceName: str | None = None
+    platform: str | None = None
+    transports: list[str] | None = None
+    clientDataJSON: str
+    authenticatorData: str
+    signature: str
+
+
+# Optional legacy aliases if we want to keep older route code compiling temporarily
+PasskeyBeginResponse = PasskeyAssertionBeginResponse
+PasskeyFinishRequest = PasskeyAssertionFinishRequest
