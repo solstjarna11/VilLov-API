@@ -1,6 +1,7 @@
 # app/services/auth_service.py
 
 import json
+import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -41,6 +42,8 @@ from app.schemas.auth import (
     PasskeyRegistrationFinishRequest,
     SessionToken,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -124,7 +127,11 @@ class AuthService:
         except InvalidRegistrationResponse as exc:
             raise ValueError(f"registration_verification_failed:{exc}") from exc
 
-        stored_credential_id = self._encode_credential_id(verification.credential_id)
+        verified_credential_id_bytes = self._extract_verified_credential_id_bytes(
+            verification=verification,
+            fallback_credential_id=request.credentialID,
+        )
+        stored_credential_id = self._encode_credential_id(verified_credential_id_bytes)
         transports_str = json.dumps(request.transports or [])
 
         existing = self.db.execute(
@@ -167,16 +174,31 @@ class AuthService:
     ) -> PasskeyAssertionBeginResponse:
         user = self._get_user_or_raise(user_id)
 
-        allow_credentials = [
-            PublicKeyCredentialDescriptor(
-                id=self._decode_credential_id(credential.credential_id)
+        stored_credentials = self.db.execute(
+            select(PasskeyCredential).where(
+                PasskeyCredential.user_id == user.user_id
             )
-            for credential in self.db.execute(
-                select(PasskeyCredential).where(
-                    PasskeyCredential.user_id == user.user_id
+        ).scalars().all()
+
+        allow_credentials: list[PublicKeyCredentialDescriptor] = []
+
+        for credential in stored_credentials:
+            credential_id_bytes = self._try_decode_credential_id(
+                credential.credential_id
+            )
+            if credential_id_bytes is None:
+                logger.warning(
+                    "Skipping malformed legacy credential_id during login begin "
+                    "for user_id=%s passkey_credential_id=%s stored_credential_id=%r",
+                    user.user_id,
+                    credential.id,
+                    credential.credential_id,
                 )
-            ).scalars().all()
-        ]
+                continue
+
+            allow_credentials.append(
+                PublicKeyCredentialDescriptor(id=credential_id_bytes)
+            )
 
         options = generate_authentication_options(
             rp_id=WEBAUTHN_RP_ID,
@@ -380,6 +402,52 @@ class AuthService:
     @staticmethod
     def _decode_credential_id(credential_id: str) -> bytes:
         return base64url_to_bytes(credential_id)
+
+    def _try_decode_credential_id(self, credential_id: str) -> bytes | None:
+        """
+        Decode a stored credential ID into raw bytes.
+
+        Current canonical format:
+        - base64url string
+
+        Legacy tolerance:
+        - hex string, if older data was stored as hex
+        - malformed values are ignored by returning None
+        """
+        if not credential_id:
+            return None
+
+        # Canonical path: base64url text -> bytes
+        try:
+            return self._decode_credential_id(credential_id)
+        except Exception:
+            pass
+
+        # Legacy fallback: hex text -> bytes
+        try:
+            return bytes.fromhex(credential_id)
+        except Exception:
+            pass
+
+        return None
+
+    def _extract_verified_credential_id_bytes(
+        self,
+        verification,
+        fallback_credential_id: str,
+    ) -> bytes:
+        """
+        Prefer the verified credential ID returned by the library.
+        Fall back to decoding the client-supplied credential ID if needed.
+        """
+        verification_credential_id = getattr(verification, "credential_id", None)
+        if isinstance(verification_credential_id, bytes):
+            return verification_credential_id
+
+        fallback_bytes = self._try_decode_credential_id(fallback_credential_id)
+        if fallback_bytes is None:
+            raise ValueError("registration_credential_id_invalid_format")
+        return fallback_bytes
 
     @staticmethod
     def _utc_now() -> datetime:
