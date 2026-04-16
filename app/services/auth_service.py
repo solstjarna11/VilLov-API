@@ -13,6 +13,8 @@ from webauthn import (
     verify_authentication_response,
     verify_registration_response,
 )
+from webauthn.helpers.base64url_to_bytes import base64url_to_bytes
+from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
 from webauthn.helpers.exceptions import (
     InvalidAuthenticationResponse,
     InvalidRegistrationResponse,
@@ -122,19 +124,20 @@ class AuthService:
         except InvalidRegistrationResponse as exc:
             raise ValueError(f"registration_verification_failed:{exc}") from exc
 
+        stored_credential_id = self._encode_credential_id(verification.credential_id)
+        transports_str = json.dumps(request.transports or [])
+
         existing = self.db.execute(
             select(PasskeyCredential).where(
-                PasskeyCredential.credential_id == request.credentialID
+                PasskeyCredential.credential_id == stored_credential_id
             )
         ).scalar_one_or_none()
-
-        transports_str = json.dumps(request.transports or [])
 
         if existing is None:
             credential = PasskeyCredential(
                 user_id=user.user_id,
                 device_id=device.device_id,
-                credential_id=request.credentialID,
+                credential_id=stored_credential_id,
                 public_key_material_or_placeholder=self._encode_public_key_bytes(
                     verification.credential_public_key
                 ),
@@ -165,7 +168,9 @@ class AuthService:
         user = self._get_user_or_raise(user_id)
 
         allow_credentials = [
-            PublicKeyCredentialDescriptor(id=credential.credential_id)
+            PublicKeyCredentialDescriptor(
+                id=self._decode_credential_id(credential.credential_id)
+            )
             for credential in self.db.execute(
                 select(PasskeyCredential).where(
                     PasskeyCredential.user_id == user.user_id
@@ -367,6 +372,14 @@ class AuthService:
     @staticmethod
     def _decode_public_key_bytes(public_key_hex: str) -> bytes:
         return bytes.fromhex(public_key_hex)
+
+    @staticmethod
+    def _encode_credential_id(credential_id: bytes) -> str:
+        return bytes_to_base64url(credential_id)
+
+    @staticmethod
+    def _decode_credential_id(credential_id: str) -> bytes:
+        return base64url_to_bytes(credential_id)
 
     @staticmethod
     def _utc_now() -> datetime:
