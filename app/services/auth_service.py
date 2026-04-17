@@ -503,7 +503,12 @@ class AuthService:
             raise ValueError("challenge_not_found")
         if row.consumed_at is not None:
             raise ValueError("challenge_already_used")
-        if row.expires_at < self._utc_now():
+
+        expires_at = row.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+
+        if expires_at < self._utc_now():
             raise ValueError("challenge_expired")
 
         return row
