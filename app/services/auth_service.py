@@ -484,7 +484,8 @@ class AuthService:
             consumed_at=None,
         )
         self.db.add(row)
-        self.db.flush()
+        self.db.commit()
+        self.db.refresh(row)
 
     def _get_valid_challenge_or_raise(
         self,
