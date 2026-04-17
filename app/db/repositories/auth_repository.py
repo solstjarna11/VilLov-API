@@ -1,3 +1,5 @@
+# app/db/repositories/auth_repository.py
+
 from sqlalchemy.orm import Session
 
 from app.db.models import AuthSession

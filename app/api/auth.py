@@ -1,3 +1,5 @@
+# app/api/auth.py
+
 import logging
 from typing import Annotated
 
@@ -26,13 +28,15 @@ def passkey_register_begin(
     db: Annotated[Session, Depends(get_db)],
 ) -> PasskeyRegistrationBeginResponse:
     logger.info(
-        "auth register begin requested user_handle=%s device_id=%s",
+        "auth register begin requested user_handle=%s device_id=%s display_name=%s",
         request.userHandle,
         request.deviceID,
+        request.displayName,
     )
     return AuthService(db).begin_register_passkey(
         user_id=request.userHandle or DEFAULT_SIGNIN_USER_ID,
         device_id=request.deviceID,
+        display_name=request.displayName,
     )
 
 
@@ -80,7 +84,6 @@ def passkey_login_finish(
     return AuthService(db).finish_login_passkey(request)
 
 
-# Optional legacy compatibility
 @router.post("/passkey/begin", response_model=PasskeyAssertionBeginResponse)
 def passkey_begin(
     request: PasskeyBeginRequest,

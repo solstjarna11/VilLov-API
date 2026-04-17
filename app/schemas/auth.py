@@ -16,6 +16,7 @@ class SessionToken(BaseModel):
 class PasskeyBeginRequest(BaseModel):
     userHandle: str | None = None
     deviceID: str | None = None
+    displayName: str | None = None
 
 
 class PasskeyRegistrationBeginResponse(BaseModel):
@@ -57,6 +58,5 @@ class PasskeyAssertionFinishRequest(BaseModel):
     signature: str
 
 
-# Optional legacy aliases if we want to keep older route code compiling temporarily
 PasskeyBeginResponse = PasskeyAssertionBeginResponse
 PasskeyFinishRequest = PasskeyAssertionFinishRequest

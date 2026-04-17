@@ -58,8 +58,15 @@ class AuthService:
         self,
         user_id: str,
         device_id: str | None = None,
+        display_name: str | None = None,
     ) -> PasskeyRegistrationBeginResponse:
-        user = self._get_user_or_raise(user_id)
+        normalized_user_id = self._normalize_user_id(user_id)
+        validated_display_name = self._validate_display_name(display_name)
+
+        user = self._get_or_create_user(
+            user_id=normalized_user_id,
+            display_name=validated_display_name or normalized_user_id,
+        )
 
         options = generate_registration_options(
             rp_id=WEBAUTHN_RP_ID,
@@ -155,7 +162,8 @@ class AuthService:
         user_id: str,
         device_id: str | None = None,
     ) -> PasskeyAssertionBeginResponse:
-        user = self._get_user_or_raise(user_id)
+        normalized_user_id = self._normalize_user_id(user_id)
+        user = self._get_user_or_raise(normalized_user_id)
 
         stored_credentials = self.db.execute(
             select(PasskeyCredential).where(
@@ -370,7 +378,6 @@ class AuthService:
         except Exception as exc:
             raise ValueError("dev_registration_invalid_public_key_encoding") from exc
 
-        # Validate the key is a usable P-256 public key
         try:
             ec.EllipticCurvePublicKey.from_encoded_point(
                 ec.SECP256R1(),
@@ -507,6 +514,50 @@ class AuthService:
         if user is None:
             raise ValueError("user_not_found")
         return user
+
+    def _get_or_create_user(
+        self,
+        user_id: str,
+        display_name: str,
+    ) -> User:
+        user = self.db.execute(
+            select(User).where(User.user_id == user_id)
+        ).scalar_one_or_none()
+
+        if user is not None:
+            if display_name and user.display_name != display_name:
+                user.display_name = display_name
+                user.updated_at = self._utc_now()
+            return user
+
+        now = self._utc_now()
+        user = User(
+            user_id=user_id,
+            display_name=display_name,
+            created_at=now,
+            updated_at=now,
+        )
+        self.db.add(user)
+        self.db.flush()
+        return user
+
+    def _normalize_user_id(self, user_id: str) -> str:
+        normalized = user_id.strip().lower()
+        if not normalized:
+            raise ValueError("user_id_required")
+        if not normalized.replace("_", "").isalnum():
+            raise ValueError("user_id_invalid")
+        return normalized
+
+    def _validate_display_name(self, display_name: str | None) -> str | None:
+        if display_name is None:
+            return None
+        normalized = display_name.strip()
+        if not normalized:
+            return None
+        if len(normalized) > 100:
+            raise ValueError("display_name_too_long")
+        return normalized
 
     def _get_or_create_device(
         self,
