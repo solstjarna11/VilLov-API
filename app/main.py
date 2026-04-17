@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
 from app.api.contacts import router as contacts_router
@@ -29,6 +30,18 @@ def startup() -> None:
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         seed_db(db)
+
+
+@app.get("/.well-known/apple-app-site-association", include_in_schema=False)
+def apple_app_site_association():
+    return JSONResponse(
+        content={
+            "webcredentials": {
+                "apps": ["OUR_TEAM_ID.com.our.bundleid"]
+            }
+        },
+        media_type="application/json",
+    )
 
 
 @app.get("/health")

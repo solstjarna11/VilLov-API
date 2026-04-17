@@ -1,11 +1,7 @@
-# app/api/auth.py
-
 import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
-
 from sqlalchemy.orm import Session
 
 from app.config import DEFAULT_SIGNIN_USER_ID
@@ -24,18 +20,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/.well-known/apple-app-site-association", include_in_schema=False)
-def apple_app_site_association():
-    return JSONResponse(
-        content={
-            "webcredentials": {
-                "apps": ["OUR_TEAM_ID.com.our.bundleid"]
-            }
-        },
-        media_type="application/json",
-    )
-
-@router.post("/passkey/register/begin")
+@router.post("/passkey/register/begin", response_model=PasskeyRegistrationBeginResponse)
 def passkey_register_begin(
     request: PasskeyBeginRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -51,7 +36,7 @@ def passkey_register_begin(
     )
 
 
-@router.post("/passkey/register/finish")
+@router.post("/passkey/register/finish", response_model=SessionToken)
 def passkey_register_finish(
     request: PasskeyRegistrationFinishRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -65,7 +50,7 @@ def passkey_register_finish(
     return AuthService(db).finish_register_passkey(request)
 
 
-@router.post("/passkey/login/begin")
+@router.post("/passkey/login/begin", response_model=PasskeyAssertionBeginResponse)
 def passkey_login_begin(
     request: PasskeyBeginRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -81,7 +66,7 @@ def passkey_login_begin(
     )
 
 
-@router.post("/passkey/login/finish")
+@router.post("/passkey/login/finish", response_model=SessionToken)
 def passkey_login_finish(
     request: PasskeyAssertionFinishRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -96,7 +81,7 @@ def passkey_login_finish(
 
 
 # Optional legacy compatibility
-@router.post("/passkey/begin")
+@router.post("/passkey/begin", response_model=PasskeyAssertionBeginResponse)
 def passkey_begin(
     request: PasskeyBeginRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -112,7 +97,7 @@ def passkey_begin(
     )
 
 
-@router.post("/passkey/finish")
+@router.post("/passkey/finish", response_model=SessionToken)
 def passkey_finish(
     request: PasskeyAssertionFinishRequest,
     db: Annotated[Session, Depends(get_db)],

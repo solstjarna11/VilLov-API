@@ -5,6 +5,9 @@ import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from webauthn import (
@@ -29,6 +32,7 @@ from webauthn.helpers.structs import (
 
 from app.config import (
     CHALLENGE_TTL_MINUTES,
+    ENABLE_DEVELOPMENT_PASSKEY_AUTH,
     TOKEN_TTL_DAYS,
     WEBAUTHN_ORIGIN,
     WEBAUTHN_RP_ID,
@@ -108,30 +112,9 @@ class AuthService:
             platform=request.platform or "ios",
         )
 
-        try:
-            verification = verify_registration_response(
-                credential={
-                    "id": request.credentialID,
-                    "rawId": request.credentialID,
-                    "type": "public-key",
-                    "response": {
-                        "clientDataJSON": request.clientDataJSON,
-                        "attestationObject": request.attestationObject,
-                    },
-                },
-                expected_challenge=request.challenge,
-                expected_rp_id=WEBAUTHN_RP_ID,
-                expected_origin=WEBAUTHN_ORIGIN,
-                require_user_verification=False,
-            )
-        except InvalidRegistrationResponse as exc:
-            raise ValueError(f"registration_verification_failed:{exc}") from exc
-
-        verified_credential_id_bytes = self._extract_verified_credential_id_bytes(
-            verification=verification,
-            fallback_credential_id=request.credentialID,
+        stored_credential_id, public_key_bytes, sign_count = self._verify_registration(
+            request
         )
-        stored_credential_id = self._encode_credential_id(verified_credential_id_bytes)
         transports_str = json.dumps(request.transports or [])
 
         existing = self.db.execute(
@@ -146,9 +129,9 @@ class AuthService:
                 device_id=device.device_id,
                 credential_id=stored_credential_id,
                 public_key_material_or_placeholder=self._encode_public_key_bytes(
-                    verification.credential_public_key
+                    public_key_bytes
                 ),
-                sign_count=verification.sign_count,
+                sign_count=sign_count,
                 transports_or_metadata=transports_str,
                 created_at=self._utc_now(),
             )
@@ -157,9 +140,9 @@ class AuthService:
             existing.user_id = user.user_id
             existing.device_id = device.device_id
             existing.public_key_material_or_placeholder = self._encode_public_key_bytes(
-                verification.credential_public_key
+                public_key_bytes
             )
-            existing.sign_count = verification.sign_count
+            existing.sign_count = sign_count
             existing.transports_or_metadata = transports_str
 
         challenge_row.consumed_at = self._utc_now()
@@ -188,7 +171,7 @@ class AuthService:
             )
             if credential_id_bytes is None:
                 logger.warning(
-                    "Skipping malformed legacy credential_id during login begin "
+                    "Skipping malformed credential_id during login begin "
                     "for user_id=%s passkey_credential_id=%s stored_credential_id=%r",
                     user.user_id,
                     credential.id,
@@ -246,6 +229,76 @@ class AuthService:
         if credential.user_id != challenge_row.user_id:
             raise PermissionError("credential_user_mismatch")
 
+        new_sign_count = self._verify_authentication(
+            request=request,
+            credential=credential,
+        )
+
+        credential.sign_count = new_sign_count
+        challenge_row.consumed_at = self._utc_now()
+
+        resolved_device_id = request.deviceID or credential.device_id
+        device = self._get_or_create_device(
+            user_id=credential.user_id,
+            device_id=resolved_device_id,
+            device_name=request.deviceName or f"{credential.user_id} iPhone",
+            platform=request.platform or "ios",
+        )
+
+        token = self._create_session_token(credential.user_id, device.device_id)
+        self.db.commit()
+        return token
+
+    def _verify_registration(
+        self,
+        request: PasskeyRegistrationFinishRequest,
+    ) -> tuple[str, bytes, int]:
+        try:
+            verification = verify_registration_response(
+                credential={
+                    "id": request.credentialID,
+                    "rawId": request.credentialID,
+                    "type": "public-key",
+                    "response": {
+                        "clientDataJSON": request.clientDataJSON,
+                        "attestationObject": request.attestationObject,
+                    },
+                },
+                expected_challenge=request.challenge,
+                expected_rp_id=WEBAUTHN_RP_ID,
+                expected_origin=WEBAUTHN_ORIGIN,
+                require_user_verification=False,
+            )
+
+            verified_credential_id_bytes = self._extract_verified_credential_id_bytes(
+                verification=verification,
+                fallback_credential_id=request.credentialID,
+            )
+            stored_credential_id = self._encode_credential_id(
+                verified_credential_id_bytes
+            )
+
+            return (
+                stored_credential_id,
+                verification.credential_public_key,
+                verification.sign_count,
+            )
+
+        except InvalidRegistrationResponse as exc:
+            if not ENABLE_DEVELOPMENT_PASSKEY_AUTH:
+                raise ValueError(f"registration_verification_failed:{exc}") from exc
+
+            logger.warning(
+                "Strict WebAuthn registration failed, falling back to development verification: %s",
+                exc,
+            )
+            return self._verify_development_registration(request)
+
+    def _verify_authentication(
+        self,
+        request: PasskeyAssertionFinishRequest,
+        credential: PasskeyCredential,
+    ) -> int:
         try:
             verification = verify_authentication_response(
                 credential={
@@ -267,23 +320,145 @@ class AuthService:
                 credential_current_sign_count=credential.sign_count,
                 require_user_verification=False,
             )
+            return verification.new_sign_count
+
         except InvalidAuthenticationResponse as exc:
-            raise ValueError(f"authentication_verification_failed:{exc}") from exc
+            if not ENABLE_DEVELOPMENT_PASSKEY_AUTH:
+                raise ValueError(f"authentication_verification_failed:{exc}") from exc
 
-        credential.sign_count = verification.new_sign_count
-        challenge_row.consumed_at = self._utc_now()
+            logger.warning(
+                "Strict WebAuthn authentication failed, falling back to development verification: %s",
+                exc,
+            )
+            return self._verify_development_authentication(
+                request=request,
+                credential=credential,
+            )
 
-        resolved_device_id = request.deviceID or credential.device_id
-        device = self._get_or_create_device(
-            user_id=credential.user_id,
-            device_id=resolved_device_id,
-            device_name=request.deviceName or f"{credential.user_id} iPhone",
-            platform=request.platform or "ios",
+    def _verify_development_registration(
+        self,
+        request: PasskeyRegistrationFinishRequest,
+    ) -> tuple[str, bytes, int]:
+        client_data = self._decode_base64url_json(request.clientDataJSON)
+        attestation = self._decode_base64url_json(request.attestationObject)
+
+        if client_data.get("type") != "webauthn.create":
+            raise ValueError("dev_registration_invalid_type")
+
+        if client_data.get("challenge") != request.challenge:
+            raise ValueError("dev_registration_challenge_mismatch")
+
+        if client_data.get("origin") != WEBAUTHN_ORIGIN:
+            raise ValueError("dev_registration_origin_mismatch")
+
+        if attestation.get("format") != "dev-passkey-v1":
+            raise ValueError("dev_registration_invalid_attestation_format")
+
+        if attestation.get("credentialID") != request.credentialID:
+            raise ValueError("dev_registration_credential_mismatch")
+
+        public_key_encoded = attestation.get("publicKey")
+        if not isinstance(public_key_encoded, str):
+            raise ValueError("dev_registration_missing_public_key")
+
+        sign_count = attestation.get("signCount", 0)
+        if not isinstance(sign_count, int):
+            raise ValueError("dev_registration_invalid_sign_count")
+
+        try:
+            public_key_bytes = base64url_to_bytes(public_key_encoded)
+        except Exception as exc:
+            raise ValueError("dev_registration_invalid_public_key_encoding") from exc
+
+        # Validate the key is a usable P-256 public key
+        try:
+            ec.EllipticCurvePublicKey.from_encoded_point(
+                ec.SECP256R1(),
+                public_key_bytes,
+            )
+        except Exception as exc:
+            raise ValueError("dev_registration_invalid_public_key") from exc
+
+        stored_credential_id = request.credentialID
+
+        return (
+            stored_credential_id,
+            public_key_bytes,
+            sign_count,
         )
 
-        token = self._create_session_token(credential.user_id, device.device_id)
-        self.db.commit()
-        return token
+    def _verify_development_authentication(
+        self,
+        request: PasskeyAssertionFinishRequest,
+        credential: PasskeyCredential,
+    ) -> int:
+        client_data_bytes = base64url_to_bytes(request.clientDataJSON)
+        authenticator_data_bytes = base64url_to_bytes(request.authenticatorData)
+        signature_bytes = base64url_to_bytes(request.signature)
+
+        try:
+            client_data = json.loads(client_data_bytes.decode("utf-8"))
+        except Exception as exc:
+            raise ValueError("dev_auth_invalid_client_data") from exc
+
+        try:
+            authenticator_data = json.loads(authenticator_data_bytes.decode("utf-8"))
+        except Exception as exc:
+            raise ValueError("dev_auth_invalid_authenticator_data") from exc
+
+        if client_data.get("type") != "webauthn.get":
+            raise ValueError("dev_auth_invalid_type")
+
+        if client_data.get("challenge") != request.challenge:
+            raise ValueError("dev_auth_challenge_mismatch")
+
+        if client_data.get("origin") != WEBAUTHN_ORIGIN:
+            raise ValueError("dev_auth_origin_mismatch")
+
+        if authenticator_data.get("rpID") != WEBAUTHN_RP_ID:
+            raise ValueError("dev_auth_rp_id_mismatch")
+
+        if authenticator_data.get("userPresent") is not True:
+            raise ValueError("dev_auth_user_not_present")
+
+        sign_count = authenticator_data.get("signCount")
+        if not isinstance(sign_count, int):
+            raise ValueError("dev_auth_invalid_sign_count")
+
+        if sign_count <= credential.sign_count:
+            raise ValueError("dev_auth_sign_count_not_increasing")
+
+        public_key_bytes = self._decode_public_key_bytes(
+            credential.public_key_material_or_placeholder
+        )
+
+        try:
+            public_key = ec.EllipticCurvePublicKey.from_encoded_point(
+                ec.SECP256R1(),
+                public_key_bytes,
+            )
+        except Exception as exc:
+            raise ValueError("dev_auth_invalid_stored_public_key") from exc
+
+        signature_input = authenticator_data_bytes + client_data_bytes
+
+        try:
+            public_key.verify(
+                signature_bytes,
+                signature_input,
+                ec.ECDSA(hashes.SHA256()),
+            )
+        except InvalidSignature as exc:
+            raise ValueError("dev_auth_signature_invalid") from exc
+
+        return sign_count
+
+    def _decode_base64url_json(self, value: str) -> dict:
+        try:
+            decoded = base64url_to_bytes(value)
+            return json.loads(decoded.decode("utf-8"))
+        except Exception as exc:
+            raise ValueError("invalid_base64url_json") from exc
 
     def _store_challenge(
         self,
@@ -404,26 +579,14 @@ class AuthService:
         return base64url_to_bytes(credential_id)
 
     def _try_decode_credential_id(self, credential_id: str) -> bytes | None:
-        """
-        Decode a stored credential ID into raw bytes.
-
-        Current canonical format:
-        - base64url string
-
-        Legacy tolerance:
-        - hex string, if older data was stored as hex
-        - malformed values are ignored by returning None
-        """
         if not credential_id:
             return None
 
-        # Canonical path: base64url text -> bytes
         try:
             return self._decode_credential_id(credential_id)
         except Exception:
             pass
 
-        # Legacy fallback: hex text -> bytes
         try:
             return bytes.fromhex(credential_id)
         except Exception:
@@ -436,10 +599,6 @@ class AuthService:
         verification,
         fallback_credential_id: str,
     ) -> bytes:
-        """
-        Prefer the verified credential ID returned by the library.
-        Fall back to decoding the client-supplied credential ID if needed.
-        """
         verification_credential_id = getattr(verification, "credential_id", None)
         if isinstance(verification_credential_id, bytes):
             return verification_credential_id

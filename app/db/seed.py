@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import TOKEN_TTL_DAYS
-from app.db.models import AuthSession, Device, KeyBundle, PasskeyCredential, User
+from app.db.models import AuthSession, Device, User
 
 SEEDED_USERS = [
     ("user_alice", "Alice Johnson"),
@@ -19,10 +19,6 @@ def _token_for_user(user_id: str) -> str:
 
 def _device_id_for_user(user_id: str) -> str:
     return f"device-{user_id}-iphone"
-
-
-def _credential_id_for_user(user_id: str) -> str:
-    return f"credential-{user_id}-primary"
 
 
 def issue_dev_token(user_id: str) -> tuple[str, datetime]:
@@ -56,7 +52,6 @@ def seed_db(db: Session) -> None:
 
     for user_id, _ in SEEDED_USERS:
         device_id = _device_id_for_user(user_id)
-        credential_id = _credential_id_for_user(user_id)
 
         existing_device = db.execute(
             select(Device).where(Device.device_id == device_id)
@@ -80,40 +75,6 @@ def seed_db(db: Session) -> None:
             existing_device.platform = "ios"
             existing_device.last_seen_at = now
             existing_device.is_active = True
-
-        existing_bundle = db.get(KeyBundle, user_id)
-        if existing_bundle is None:
-            db.add(
-                KeyBundle(
-                    user_id=user_id,
-                    identity_key=f"stub-identity-key-{user_id}",
-                    signed_prekey=f"stub-signed-prekey-{user_id}",
-                    signed_prekey_signature=f"stub-signature-{user_id}",
-                    one_time_prekey=f"stub-onetime-prekey-{user_id}",
-                )
-            )
-
-        existing_credential = db.execute(
-            select(PasskeyCredential).where(PasskeyCredential.credential_id == credential_id)
-        ).scalar_one_or_none()
-
-        if existing_credential is None:
-            db.add(
-                PasskeyCredential(
-                    user_id=user_id,
-                    device_id=device_id,
-                    credential_id=credential_id,
-                    public_key_material_or_placeholder="stub-public-key",
-                    sign_count=0,
-                    transports_or_metadata="internal",
-                    created_at=now,
-                )
-            )
-        else:
-            existing_credential.user_id = user_id
-            existing_credential.device_id = device_id
-            existing_credential.public_key_material_or_placeholder = "stub-public-key"
-            existing_credential.transports_or_metadata = "internal"
 
         token = _token_for_user(user_id)
         existing_session = db.execute(
@@ -140,6 +101,7 @@ def seed_db(db: Session) -> None:
             existing_session.revoked_at = None
 
     db.commit()
+
 
 if __name__ == "__main__":
     from app.db.database import Base, SessionLocal, engine

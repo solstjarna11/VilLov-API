@@ -1,3 +1,5 @@
+# app/config.py
+
 from pathlib import Path
 from datetime import timedelta
 
@@ -14,6 +16,8 @@ TOKEN_TTL_DAYS = 30
 CHALLENGE_TTL_MINUTES = 5
 ACCESS_TOKEN_EXPIRE_DELTA = timedelta(days=TOKEN_TTL_DAYS)
 CHALLENGE_EXPIRE_DELTA = timedelta(minutes=CHALLENGE_TTL_MINUTES)
+
+ENABLE_DEVELOPMENT_PASSKEY_AUTH = True
 
 # Real passkey / WebAuthn config
 WEBAUTHN_RP_ID = "auth.villovchat.com"
