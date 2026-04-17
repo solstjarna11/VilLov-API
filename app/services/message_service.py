@@ -43,7 +43,6 @@ class MessageService:
         self.repo.acknowledge(str(request.messageID))
         return MessageAckResponse(acknowledged=True, messageID=request.messageID)
 
-    from datetime import timezone
 
     @staticmethod
     def _to_schema(envelope: MessageEnvelope) -> CiphertextEnvelope:

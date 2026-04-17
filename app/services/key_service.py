@@ -22,7 +22,7 @@ class KeyService:
             oneTimePrekey=bundle.one_time_prekey,
         )
 
-    def upload_keys(self, request: UploadKeysRequest) -> RecipientKeyBundle:
+    def upload_keys_for_user(self, user_id: str, request: UploadKeysRequest) -> RecipientKeyBundle:
         bundle = self.repo.upsert(
             user_id=request.userID,
             identity_key=request.identityKey,
