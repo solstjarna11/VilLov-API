@@ -1,3 +1,5 @@
+# app/api/messages.py
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,11 +26,10 @@ def send_message(
     principal: AuthenticatedPrincipal = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> SendCiphertextResponse:
-    logger.info(
-        "message send sender=%s recipient=%s message_id=%s",
+    logger.info("message send sender=%s recipient=%s message_id=%s session_id=%s",
         principal.user_id,
-        request.recipientUserID,
-        request.messageID,
+        recipient_id,
+        message_id,
         principal.session_id,
     )
     return MessageService(db).send(principal.user_id, request)
@@ -39,7 +40,10 @@ def get_inbox(
     principal: AuthenticatedPrincipal = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[CiphertextEnvelope]:
-    logger.info("inbox fetch for recipient=%s", principal.user_id, principal.session_id)
+    logger.info("inbox fetch for recipient=%s session_id=%s",
+        principal.user_id,
+        principal.session_id,
+    )
     return MessageService(db).inbox(principal.user_id)
 
 
@@ -49,7 +53,11 @@ def acknowledge_message(
     principal: AuthenticatedPrincipal = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MessageAckResponse:
-    logger.info("message ack recipient=%s message_id=%s", principal.user_id, request.messageID, principal.session_id)
+    logger.info("message ack recipient=%s message_id=%s session_id=%s",
+        principal.user_id,
+        request.messageID,
+        principal.session_id,
+    )
     service = MessageService(db)
     try:
         return service.acknowledge(principal.user_id, request)

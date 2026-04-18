@@ -1,5 +1,6 @@
-from sqlalchemy.orm import Session
+# app/db/repositories/key_bundle_repository.py
 
+from sqlalchemy.orm import Session
 from app.db.models import KeyBundle
 
 
