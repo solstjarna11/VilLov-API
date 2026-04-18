@@ -36,8 +36,8 @@ def get_key_bundle(
         user_id,
         principal.session_id,
         bool(getattr(bundle, "identityKey", None)),
-        bool(getattr(bundle, "signedPreKey", None)),
-        len(getattr(bundle, "oneTimePreKeys", []) or []),
+        bool(getattr(bundle, "signedPrekey", None)),
+        len(getattr(bundle, "oneTimePrekey", []) or []),
     )
     return bundle
 
@@ -56,8 +56,8 @@ def upload_keys(
         request.userID,
         principal.session_id,
         bool(getattr(request, "identityKey", None)),
-        bool(getattr(request, "signedPreKey", None)),
-        len(getattr(request, "oneTimePreKeys", []) or []),
+        bool(getattr(request, "signedPrekey", None)),
+        len(getattr(request, "oneTimePrekey", []) or []),
     )
 
     bundle = KeyService(db).upload_keys(request)
@@ -67,8 +67,8 @@ def upload_keys(
         request.userID,
         principal.session_id,
         bool(getattr(bundle, "identityKey", None)),
-        bool(getattr(bundle, "signedPreKey", None)),
-        len(getattr(bundle, "oneTimePreKeys", []) or []),
+        bool(getattr(bundle, "signedPrekey", None)),
+        len(getattr(bundle, "oneTimePrekey", []) or []),
     )
 
     return bundle
