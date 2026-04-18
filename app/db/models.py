@@ -1,9 +1,15 @@
+# app/db/models.py
+
 from datetime import datetime, UTC
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+# Foreign key constants
+USERS_USER_ID_FK = "users.user_id"
+DEVICES_DEVICE_ID_FK = "devices.device_id"
 
 
 def utcnow() -> datetime:
@@ -27,7 +33,7 @@ class Device(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
     device_name: Mapped[str] = mapped_column(String, nullable=False)
     platform: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
@@ -38,8 +44,8 @@ class PasskeyCredential(Base):
     __tablename__ = "passkey_credentials"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
-    device_id: Mapped[str] = mapped_column(ForeignKey("devices.device_id"), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(ForeignKey(DEVICES_DEVICE_ID_FK), nullable=False, index=True)
     credential_id: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     public_key_material_or_placeholder: Mapped[str] = mapped_column(Text, nullable=False)
     sign_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -52,8 +58,8 @@ class AuthSession(Base):
     __tablename__ = "auth_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
-    device_id: Mapped[str | None] = mapped_column(ForeignKey("devices.device_id"), nullable=True, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
+    device_id: Mapped[str | None] = mapped_column(ForeignKey(DEVICES_DEVICE_ID_FK), nullable=True, index=True)
     access_token: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
@@ -65,7 +71,7 @@ class AuthSession(Base):
 class KeyBundle(Base):
     __tablename__ = "key_bundles"
 
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), primary_key=True)
     identity_key: Mapped[str] = mapped_column(Text, nullable=False)
     signed_prekey: Mapped[str] = mapped_column(Text, nullable=False)
     signed_prekey_signature: Mapped[str] = mapped_column(Text, nullable=False)
@@ -78,8 +84,8 @@ class AuthChallenge(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     challenge: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     flow_type: Mapped[str] = mapped_column(String, nullable=False, index=True)  
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
-    device_id: Mapped[str | None] = mapped_column(ForeignKey("devices.device_id"), nullable=True, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
+    device_id: Mapped[str | None] = mapped_column(ForeignKey(DEVICES_DEVICE_ID_FK), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
@@ -92,8 +98,8 @@ class Conversation(Base):
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    participant_a_user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
-    participant_b_user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
+    participant_a_user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
+    participant_b_user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
@@ -101,8 +107,8 @@ class MessageEnvelope(Base):
     __tablename__ = "message_envelopes"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    sender_user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
-    recipient_user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
+    sender_user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
+    recipient_user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
     conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), nullable=False, index=True)
     ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
     header: Mapped[str] = mapped_column(Text, nullable=False)

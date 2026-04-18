@@ -9,6 +9,7 @@ __pycache__/
 *$py.class
 
 plan/
+logs/
 
 # C extensions
 *.so
