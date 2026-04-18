@@ -1,7 +1,9 @@
 # app/services/message_service.py
 
-from sqlalchemy.orm import Session
+import logging
 from datetime import timezone
+
+from sqlalchemy.orm import Session
 
 from app.db.models import MessageEnvelope
 from app.db.repositories.message_repository import MessageRepository
@@ -12,6 +14,9 @@ from app.schemas.messages import (
     SendCiphertextRequest,
     SendCiphertextResponse,
 )
+from app.utils.logging_helper import summarize_ciphertext
+
+logger = logging.getLogger(__name__)
 
 
 class MessageService:
@@ -19,6 +24,18 @@ class MessageService:
         self.repo = MessageRepository(db)
 
     def send(self, sender_user_id: str, request: SendCiphertextRequest) -> SendCiphertextResponse:
+        cipher_summary = summarize_ciphertext(request.ciphertext)
+        logger.info(
+            "message service store sender=%s recipient=%s conversation_id=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s",
+            sender_user_id,
+            request.recipientUserID,
+            request.conversationID,
+            request.messageID,
+            cipher_summary["type"],
+            cipher_summary["length"],
+            cipher_summary["preview"],
+        )
+
         envelope = MessageEnvelope(
             id=str(request.messageID),
             sender_user_id=sender_user_id,
@@ -29,23 +46,69 @@ class MessageService:
             created_at=request.sentAt,
             acknowledged=False,
         )
+
         created = self.repo.create(envelope)
+
+        stored_summary = summarize_ciphertext(created.ciphertext)
+        logger.info(
+            "message service stored sender=%s recipient=%s conversation_id=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s acknowledged=%s",
+            created.sender_user_id,
+            created.recipient_user_id,
+            created.conversation_id,
+            created.id,
+            stored_summary["type"],
+            stored_summary["length"],
+            stored_summary["preview"],
+            created.acknowledged,
+        )
+
         return SendCiphertextResponse(accepted=True, envelope=self._to_schema(created))
 
     def inbox(self, recipient_user_id: str) -> list[CiphertextEnvelope]:
         envelopes = self.repo.inbox_for_user(recipient_user_id)
+
+        logger.info(
+            "message service inbox recipient=%s count=%s",
+            recipient_user_id,
+            len(envelopes),
+        )
+
         return [self._to_schema(item) for item in envelopes]
 
     def acknowledge(self, recipient_user_id: str, request: MessageAckRequest) -> MessageAckResponse:
+        logger.info(
+            "message service acknowledge recipient=%s message_id=%s",
+            recipient_user_id,
+            request.messageID,
+        )
+
         envelope = self.repo.get(str(request.messageID))
         if envelope is None:
+            logger.warning(
+                "message service acknowledge missing recipient=%s message_id=%s",
+                recipient_user_id,
+                request.messageID,
+            )
             raise ValueError("message_not_found")
-        if envelope.recipient_user_id != recipient_user_id:
-            raise PermissionError("not_recipient")
-        self.repo.acknowledge(str(request.messageID))
-        return MessageAckResponse(acknowledged=True, messageID=request.messageID)
 
-    from datetime import timezone
+        if envelope.recipient_user_id != recipient_user_id:
+            logger.warning(
+                "message service acknowledge forbidden recipient=%s actual_recipient=%s message_id=%s",
+                recipient_user_id,
+                envelope.recipient_user_id,
+                request.messageID,
+            )
+            raise PermissionError("not_recipient")
+
+        self.repo.acknowledge(str(request.messageID))
+
+        logger.info(
+            "message service acknowledged recipient=%s message_id=%s",
+            recipient_user_id,
+            request.messageID,
+        )
+
+        return MessageAckResponse(acknowledged=True, messageID=request.messageID)
 
     @staticmethod
     def _to_schema(envelope: MessageEnvelope) -> CiphertextEnvelope:

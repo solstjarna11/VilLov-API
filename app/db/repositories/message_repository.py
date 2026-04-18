@@ -1,9 +1,14 @@
 # app/db/repositories/message_repository.py
 
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import MessageEnvelope
+from app.utils.logging_helper import summarize_ciphertext
+
+logger = logging.getLogger(__name__)
 
 
 class MessageRepository:
@@ -11,12 +16,43 @@ class MessageRepository:
         self.db = db
 
     def create(self, envelope: MessageEnvelope) -> MessageEnvelope:
+        cipher_summary = summarize_ciphertext(envelope.ciphertext)
+        logger.info(
+            "message repository insert conversation_id=%s sender=%s recipient=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s",
+            envelope.conversation_id,
+            envelope.sender_user_id,
+            envelope.recipient_user_id,
+            envelope.id,
+            cipher_summary["type"],
+            cipher_summary["length"],
+            cipher_summary["preview"],
+        )
+
         self.db.add(envelope)
         self.db.commit()
         self.db.refresh(envelope)
+
+        stored_summary = summarize_ciphertext(envelope.ciphertext)
+        logger.info(
+            "message repository inserted conversation_id=%s sender=%s recipient=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s acknowledged=%s",
+            envelope.conversation_id,
+            envelope.sender_user_id,
+            envelope.recipient_user_id,
+            envelope.id,
+            stored_summary["type"],
+            stored_summary["length"],
+            stored_summary["preview"],
+            envelope.acknowledged,
+        )
+
         return envelope
 
     def inbox_for_user(self, recipient_user_id: str) -> list[MessageEnvelope]:
+        logger.info(
+            "message repository inbox query recipient=%s",
+            recipient_user_id,
+        )
+
         stmt = (
             select(MessageEnvelope)
             .where(
@@ -25,14 +61,67 @@ class MessageRepository:
             )
             .order_by(MessageEnvelope.created_at.asc())
         )
-        return list(self.db.scalars(stmt).all())
+        rows = list(self.db.scalars(stmt).all())
+
+        logger.info(
+            "message repository inbox result recipient=%s count=%s",
+            recipient_user_id,
+            len(rows),
+        )
+
+        for row in rows:
+            cipher_summary = summarize_ciphertext(row.ciphertext)
+            logger.info(
+                "message repository inbox item recipient=%s message_id=%s conversation_id=%s sender=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s",
+                recipient_user_id,
+                row.id,
+                row.conversation_id,
+                row.sender_user_id,
+                cipher_summary["type"],
+                cipher_summary["length"],
+                cipher_summary["preview"],
+            )
+
+        return rows
 
     def get(self, message_id: str) -> MessageEnvelope | None:
-        return self.db.get(MessageEnvelope, message_id)
+        envelope = self.db.get(MessageEnvelope, message_id)
+
+        if envelope is None:
+            logger.info("message repository get message_id=%s found=%s", message_id, False)
+            return None
+
+        cipher_summary = summarize_ciphertext(envelope.ciphertext)
+        logger.info(
+            "message repository get message_id=%s found=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s",
+            message_id,
+            True,
+            cipher_summary["type"],
+            cipher_summary["length"],
+            cipher_summary["preview"],
+        )
+
+        return envelope
 
     def acknowledge(self, message_id: str) -> None:
         envelope = self.db.get(MessageEnvelope, message_id)
         if envelope is None:
+            logger.info("message repository acknowledge message_id=%s found=%s", message_id, False)
             return
+
+        logger.info(
+            "message repository acknowledge message_id=%s recipient=%s current_acknowledged=%s",
+            message_id,
+            envelope.recipient_user_id,
+            envelope.acknowledged,
+        )
+
         envelope.acknowledged = True
         self.db.commit()
+
+        logger.info(
+            "message repository acknowledged message_id=%s recipient=%s current_acknowledged=%s",
+            message_id,
+            envelope.recipient_user_id,
+            envelope.acknowledged,
+        )

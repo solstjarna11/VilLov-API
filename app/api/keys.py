@@ -20,10 +20,25 @@ def get_key_bundle(
     principal: AuthenticatedPrincipal = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RecipientKeyBundle:
-    logger.info("key bundle lookup for user_id=%s", user_id)
+    logger.info(
+        "key bundle lookup requester=%s target_user_id=%s session_id=%s",
+        principal.user_id,
+        user_id,
+        principal.session_id,
+    )
     bundle = KeyService(db).get_bundle(user_id)
     if bundle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Key bundle not found")
+
+    logger.info(
+        "key bundle lookup success requester=%s target_user_id=%s session_id=%s has_identity_key=%s has_signed_prekey=%s one_time_prekeys_count=%s",
+        principal.user_id,
+        user_id,
+        principal.session_id,
+        bool(getattr(bundle, "identityKey", None)),
+        bool(getattr(bundle, "signedPreKey", None)),
+        len(getattr(bundle, "oneTimePreKeys", []) or []),
+    )
     return bundle
 
 
@@ -35,5 +50,25 @@ def upload_keys(
 ) -> RecipientKeyBundle:
     if request.userID != principal.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot upload keys for another user")
-    logger.info("key bundle upload for user_id=%s", request.userID)
-    return KeyService(db).upload_keys(request)
+
+    logger.info(
+        "key bundle upload user_id=%s session_id=%s has_identity_key=%s has_signed_prekey=%s one_time_prekeys_count=%s",
+        request.userID,
+        principal.session_id,
+        bool(getattr(request, "identityKey", None)),
+        bool(getattr(request, "signedPreKey", None)),
+        len(getattr(request, "oneTimePreKeys", []) or []),
+    )
+
+    bundle = KeyService(db).upload_keys(request)
+
+    logger.info(
+        "key bundle upload stored user_id=%s session_id=%s has_identity_key=%s has_signed_prekey=%s one_time_prekeys_count=%s",
+        request.userID,
+        principal.session_id,
+        bool(getattr(bundle, "identityKey", None)),
+        bool(getattr(bundle, "signedPreKey", None)),
+        len(getattr(bundle, "oneTimePreKeys", []) or []),
+    )
+
+    return bundle
