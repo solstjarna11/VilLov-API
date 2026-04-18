@@ -6,7 +6,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.config import DEFAULT_SIGNIN_USER_ID
 from app.db.database import get_db
 from app.schemas.auth import (
     PasskeyAssertionBeginResponse,
@@ -34,7 +33,7 @@ def passkey_register_begin(
         request.displayName,
     )
     return AuthService(db).begin_register_passkey(
-        user_id=request.userHandle or DEFAULT_SIGNIN_USER_ID,
+        user_id=request.userHandle,
         device_id=request.deviceID,
         display_name=request.displayName,
     )
@@ -65,7 +64,7 @@ def passkey_login_begin(
         request.deviceID,
     )
     return AuthService(db).begin_login_passkey(
-        user_id=request.userHandle or DEFAULT_SIGNIN_USER_ID,
+        user_id=request.userHandle,
         device_id=request.deviceID,
     )
 
@@ -95,7 +94,7 @@ def passkey_begin(
         request.deviceID,
     )
     return AuthService(db).begin_login_passkey(
-        user_id=request.userHandle or DEFAULT_SIGNIN_USER_ID,
+        user_id=request.userHandle,
         device_id=request.deviceID,
     )
 

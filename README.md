@@ -19,7 +19,6 @@ Implemented:
 
 Deliberately not implemented yet:
 
-- real WebAuthn / passkey verification
 - real end-to-end cryptography
 - real device linking
 - production JWT/session handling
@@ -61,14 +60,8 @@ uvicorn app.main:app --reload
 Default base URL:
 
 ```text
-http://127.0.0.1:8000
+auth.villovchat.com
 ```
-
-## Seeded users
-
-- `user_alice`
-- `user_bob`
-- `user_charlie`
 
 ## Known development tokens
 
@@ -91,7 +84,6 @@ The backend implements a simplified passkey (WebAuthn-style) flow.
 
 1. Client requests a challenge (`/auth/passkey/login/begin`)
    - accepts optional `userHandle` and `deviceID`
-   - defaults to `DEFAULT_SIGNIN_USER_ID` if omitted (dev behavior)
 2. Client signs challenge locally
 3. Server verifies challenge and credential existence
 4. Server creates a session and returns a bearer token

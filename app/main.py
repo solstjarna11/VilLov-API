@@ -28,8 +28,8 @@ app.include_router(messages_router)
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        seed_db(db)
+    #with SessionLocal() as db:
+        #seed_db(db)
 
 
 @app.get("/.well-known/apple-app-site-association", include_in_schema=False)

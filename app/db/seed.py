@@ -8,9 +8,7 @@ from app.db.models import AuthSession, Device, User
 
 SEEDED_USERS = [
     ("user_alice", "Alice Johnson"),
-    ("user_bob", "Bob Smith"),
-    ("user_charlie", "Charlie Brown"),
-]
+    ("user_bob", "Bob Smith"),]
 
 
 def _token_for_user(user_id: str) -> str:
