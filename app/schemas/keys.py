@@ -32,3 +32,7 @@ class UploadKeysRequest(BaseModel):
 
     # Backward-compatible legacy field
     oneTimePrekey: Optional[str] = None
+
+
+class OneTimePreKeyCountResponse(BaseModel):
+    remaining: int

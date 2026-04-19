@@ -3,7 +3,11 @@
 from sqlalchemy.orm import Session
 
 from app.db.repositories.key_bundle_repository import KeyBundleRepository
-from app.schemas.keys import RecipientKeyBundle, UploadKeysRequest
+from app.schemas.keys import (
+    OneTimePreKeyCountResponse,
+    RecipientKeyBundle,
+    UploadKeysRequest,
+)
 
 
 class KeyService:
@@ -53,4 +57,9 @@ class KeyService:
             signedPrekeySignature=bundle.signed_prekey_signature,
             oneTimePrekey=bundle.one_time_prekey,
             oneTimePrekeyId=None,
+        )
+
+    def get_remaining_opk_count(self, user_id: str) -> OneTimePreKeyCountResponse:
+        return OneTimePreKeyCountResponse(
+            remaining=self.repo.count_remaining_one_time_prekeys(user_id)
         )

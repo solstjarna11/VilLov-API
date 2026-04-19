@@ -75,6 +75,7 @@ class KeyBundle(Base):
 
     user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), primary_key=True)
     identity_key: Mapped[str] = mapped_column(Text, nullable=False)
+    identity_agreement_key: Mapped[str] = mapped_column(Text, nullable=False)
     signed_prekey: Mapped[str] = mapped_column(Text, nullable=False)
     signed_prekey_signature: Mapped[str] = mapped_column(Text, nullable=False)
     # Deprecated compatibility field. New flows should use OneTimePreKey rows.

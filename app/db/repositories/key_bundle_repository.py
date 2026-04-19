@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import KeyBundle, OneTimePreKey
@@ -19,6 +19,7 @@ class KeyBundleRepository:
         self,
         user_id: str,
         identity_key: str,
+        identity_agreement_key: str,
         signed_prekey: str,
         signed_prekey_signature: str,
         one_time_prekey: str | None,
@@ -28,6 +29,7 @@ class KeyBundleRepository:
             bundle = KeyBundle(
                 user_id=user_id,
                 identity_key=identity_key,
+                identity_agreement_key=identity_agreement_key,
                 signed_prekey=signed_prekey,
                 signed_prekey_signature=signed_prekey_signature,
                 one_time_prekey=one_time_prekey,
@@ -35,6 +37,7 @@ class KeyBundleRepository:
             self.db.add(bundle)
         else:
             bundle.identity_key = identity_key
+            bundle.identity_agreement_key = identity_agreement_key
             bundle.signed_prekey = signed_prekey
             bundle.signed_prekey_signature = signed_prekey_signature
             # Keep legacy compatibility behavior only.
@@ -47,7 +50,7 @@ class KeyBundleRepository:
     def create_one_time_prekeys(
         self,
         user_id: str,
-        prekeys: list[tuple[str, str]],  # [(id, public_key)]
+        prekeys: list[tuple[str, str]],
     ) -> None:
         if not prekeys:
             return
@@ -85,3 +88,10 @@ class KeyBundleRepository:
             self.db.flush()
             self.db.refresh(row)
             return row
+
+    def count_remaining_one_time_prekeys(self, user_id: str) -> int:
+        stmt = select(func.count()).select_from(OneTimePreKey).where(
+            OneTimePreKey.user_id == user_id,
+            OneTimePreKey.is_consumed.is_(False),
+        )
+        return int(self.db.execute(stmt).scalar_one())

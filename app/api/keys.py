@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.dependencies.auth import AuthenticatedPrincipal, get_current_user
-from app.schemas.keys import RecipientKeyBundle, UploadKeysRequest
+from app.schemas.keys import (
+    OneTimePreKeyCountResponse,
+    RecipientKeyBundle,
+    UploadKeysRequest,
+)
 from app.services.key_service import KeyService
 
 router = APIRouter(prefix="/keys", tags=["keys"])
@@ -52,7 +56,10 @@ def upload_keys(
     db: Session = Depends(get_db),
 ) -> RecipientKeyBundle:
     if request.userID != principal.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot upload keys for another user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot upload keys for another user",
+        )
 
     logger.info(
         "key bundle upload user_id=%s session_id=%s has_identity_key=%s has_identity_agreement_key=%s has_signed_prekey=%s one_time_prekeys_count=%s has_legacy_one_time_prekey=%s",
@@ -77,3 +84,20 @@ def upload_keys(
     )
 
     return bundle
+
+
+@router.get("/me/opk-count", response_model=OneTimePreKeyCountResponse)
+def get_my_opk_count(
+    principal: AuthenticatedPrincipal = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> OneTimePreKeyCountResponse:
+    result = KeyService(db).get_remaining_opk_count(principal.user_id)
+
+    logger.info(
+        "opk count requester=%s session_id=%s remaining=%s",
+        principal.user_id,
+        principal.session_id,
+        result.remaining,
+    )
+
+    return result

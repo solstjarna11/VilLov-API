@@ -8,8 +8,7 @@ DB_PATH = BASE_DIR / "villov_dev.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 API_TITLE = "VilLov Chat Dev Backend"
-API_VERSION = "0.1.1"
-DEV_RP_ID = "villov.local"
+API_VERSION = "0.1.2"
 TOKEN_TTL_DAYS = 30
 CHALLENGE_TTL_MINUTES = 5
 ACCESS_TOKEN_EXPIRE_DELTA = timedelta(days=TOKEN_TTL_DAYS)
