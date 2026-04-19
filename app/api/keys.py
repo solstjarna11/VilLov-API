@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.dependencies.auth import get_current_user, AuthenticatedPrincipal
+from app.dependencies.auth import AuthenticatedPrincipal, get_current_user
 from app.schemas.keys import RecipientKeyBundle, UploadKeysRequest
 from app.services.key_service import KeyService
 
@@ -26,18 +26,21 @@ def get_key_bundle(
         user_id,
         principal.session_id,
     )
+
     bundle = KeyService(db).get_bundle(user_id)
     if bundle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Key bundle not found")
 
     logger.info(
-        "key bundle lookup success requester=%s target_user_id=%s session_id=%s has_identity_key=%s has_signed_prekey=%s one_time_prekeys_count=%s",
+        "key bundle lookup success requester=%s target_user_id=%s session_id=%s has_identity_key=%s has_identity_agreement_key=%s has_signed_prekey=%s has_one_time_prekey=%s one_time_prekey_id=%s",
         principal.user_id,
         user_id,
         principal.session_id,
-        bool(getattr(bundle, "identityKey", None)),
-        bool(getattr(bundle, "signedPrekey", None)),
-        len(getattr(bundle, "oneTimePrekey", []) or []),
+        bool(bundle.identityKey),
+        bool(bundle.identityAgreementKey),
+        bool(bundle.signedPrekey),
+        bool(bundle.oneTimePrekey),
+        bundle.oneTimePrekeyId,
     )
     return bundle
 
@@ -52,23 +55,25 @@ def upload_keys(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot upload keys for another user")
 
     logger.info(
-        "key bundle upload user_id=%s session_id=%s has_identity_key=%s has_signed_prekey=%s one_time_prekeys_count=%s",
+        "key bundle upload user_id=%s session_id=%s has_identity_key=%s has_identity_agreement_key=%s has_signed_prekey=%s one_time_prekeys_count=%s has_legacy_one_time_prekey=%s",
         request.userID,
         principal.session_id,
-        bool(getattr(request, "identityKey", None)),
-        bool(getattr(request, "signedPrekey", None)),
-        len(getattr(request, "oneTimePrekey", []) or []),
+        bool(request.identityKey),
+        bool(request.identityAgreementKey),
+        bool(request.signedPrekey),
+        len(request.oneTimePrekeys),
+        bool(request.oneTimePrekey),
     )
 
     bundle = KeyService(db).upload_keys(request)
 
     logger.info(
-        "key bundle upload stored user_id=%s session_id=%s has_identity_key=%s has_signed_prekey=%s one_time_prekeys_count=%s",
+        "key bundle upload stored user_id=%s session_id=%s has_identity_key=%s has_identity_agreement_key=%s has_signed_prekey=%s",
         request.userID,
         principal.session_id,
-        bool(getattr(bundle, "identityKey", None)),
-        bool(getattr(bundle, "signedPrekey", None)),
-        len(getattr(bundle, "oneTimePrekey", []) or []),
+        bool(bundle.identityKey),
+        bool(bundle.identityAgreementKey),
+        bool(bundle.signedPrekey),
     )
 
     return bundle

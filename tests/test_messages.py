@@ -8,6 +8,7 @@ def test_key_bundle_fetch(client):
     data = response.json()
     assert data["userID"] == "user_bob"
     assert "identityKey" in data
+    assert "identityAgreementKey" in data
     assert "signedPrekey" in data
 
 

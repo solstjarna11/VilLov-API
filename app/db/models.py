@@ -7,13 +7,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
-# Foreign key constants
 USERS_USER_ID_FK = "users.user_id"
 DEVICES_DEVICE_ID_FK = "devices.device_id"
 
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -25,7 +25,8 @@ class User(Base):
         DateTime(timezone=True),
         nullable=False,
         default=utcnow,
-        onupdate=utcnow,)
+        onupdate=utcnow,
+    )
 
 
 class Device(Base):
@@ -40,6 +41,7 @@ class Device(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
 
+
 class PasskeyCredential(Base):
     __tablename__ = "passkey_credentials"
 
@@ -53,7 +55,6 @@ class PasskeyCredential(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
-
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
 
@@ -65,8 +66,9 @@ class AuthSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
-    user=relationship("User")
-    device=relationship("Device")
+    user = relationship("User")
+    device = relationship("Device")
+
 
 class KeyBundle(Base):
     __tablename__ = "key_bundles"
@@ -75,7 +77,19 @@ class KeyBundle(Base):
     identity_key: Mapped[str] = mapped_column(Text, nullable=False)
     signed_prekey: Mapped[str] = mapped_column(Text, nullable=False)
     signed_prekey_signature: Mapped[str] = mapped_column(Text, nullable=False)
+    # Deprecated compatibility field. New flows should use OneTimePreKey rows.
     one_time_prekey: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OneTimePreKey(Base):
+    __tablename__ = "one_time_prekeys"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
+    prekey_public: Mapped[str] = mapped_column(Text, nullable=False)
+    is_consumed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
 
 class AuthChallenge(Base):
@@ -83,7 +97,7 @@ class AuthChallenge(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     challenge: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    flow_type: Mapped[str] = mapped_column(String, nullable=False, index=True)  
+    flow_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey(USERS_USER_ID_FK), nullable=False, index=True)
     device_id: Mapped[str | None] = mapped_column(ForeignKey(DEVICES_DEVICE_ID_FK), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)

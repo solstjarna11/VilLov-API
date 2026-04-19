@@ -1,7 +1,11 @@
 # app/db/repositories/key_bundle_repository.py
 
+from datetime import UTC, datetime
+
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.db.models import KeyBundle
+
+from app.db.models import KeyBundle, OneTimePreKey
 
 
 class KeyBundleRepository:
@@ -33,7 +37,51 @@ class KeyBundleRepository:
             bundle.identity_key = identity_key
             bundle.signed_prekey = signed_prekey
             bundle.signed_prekey_signature = signed_prekey_signature
+            # Keep legacy compatibility behavior only.
             bundle.one_time_prekey = one_time_prekey
+
         self.db.commit()
         self.db.refresh(bundle)
         return bundle
+
+    def create_one_time_prekeys(
+        self,
+        user_id: str,
+        prekeys: list[tuple[str, str]],  # [(id, public_key)]
+    ) -> None:
+        if not prekeys:
+            return
+
+        rows = [
+            OneTimePreKey(
+                id=prekey_id,
+                user_id=user_id,
+                prekey_public=public_key,
+                is_consumed=False,
+            )
+            for prekey_id, public_key in prekeys
+        ]
+        self.db.add_all(rows)
+        self.db.commit()
+
+    def get_and_consume_one_time_prekey(self, user_id: str) -> OneTimePreKey | None:
+        stmt = (
+            select(OneTimePreKey)
+            .where(
+                OneTimePreKey.user_id == user_id,
+                OneTimePreKey.is_consumed.is_(False),
+            )
+            .order_by(OneTimePreKey.created_at.asc())
+            .with_for_update(skip_locked=True)
+        )
+
+        with self.db.begin():
+            row = self.db.execute(stmt).scalar_one_or_none()
+            if row is None:
+                return None
+
+            row.is_consumed = True
+            row.consumed_at = datetime.now(UTC)
+            self.db.flush()
+            self.db.refresh(row)
+            return row
