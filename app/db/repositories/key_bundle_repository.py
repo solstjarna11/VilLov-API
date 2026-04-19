@@ -78,16 +78,15 @@ class KeyBundleRepository:
             .with_for_update(skip_locked=True)
         )
 
-        with self.db.begin():
-            row = self.db.execute(stmt).scalar_one_or_none()
-            if row is None:
-                return None
+        row = self.db.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
 
-            row.is_consumed = True
-            row.consumed_at = datetime.now(UTC)
-            self.db.flush()
-            self.db.refresh(row)
-            return row
+        row.is_consumed = True
+        row.consumed_at = datetime.now(UTC)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
 
     def count_remaining_one_time_prekeys(self, user_id: str) -> int:
         stmt = select(func.count()).select_from(OneTimePreKey).where(
