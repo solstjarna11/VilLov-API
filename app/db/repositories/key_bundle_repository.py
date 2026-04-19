@@ -75,10 +75,11 @@ class KeyBundleRepository:
                 OneTimePreKey.is_consumed.is_(False),
             )
             .order_by(OneTimePreKey.created_at.asc())
+            .limit(1)
             .with_for_update(skip_locked=True)
         )
 
-        row = self.db.execute(stmt).scalar_one_or_none()
+        row = self.db.execute(stmt).scalars().first()
         if row is None:
             return None
 
