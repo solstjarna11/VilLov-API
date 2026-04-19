@@ -45,6 +45,7 @@ class MessageService:
             header=request.header,
             created_at=request.sentAt,
             acknowledged=False,
+            expiry_at=request.expiresAt,
         )
 
         created = self.repo.create(envelope)
@@ -115,6 +116,14 @@ class MessageService:
         created_at = envelope.created_at
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
+        else:
+            created_at = created_at.astimezone(timezone.utc)
+        expiry_at=envelope.expiry_at
+        if expiry_at is not None:
+            if expiry_at.tzinfo is None:
+                expiry_at=expiry_at.replace(tzinfo=timezone.utc)
+            else:
+                expiry_at=expiry_at.astimezone(timezone.utc)
 
         return CiphertextEnvelope(
             id=envelope.id,
@@ -124,4 +133,5 @@ class MessageService:
             ciphertext=envelope.ciphertext,
             header=envelope.header,
             createdAt=created_at,
+            expiresAt=expiry_at,
         )
