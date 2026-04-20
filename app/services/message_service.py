@@ -1,9 +1,9 @@
 # app/services/message_service.py
 
 import logging
-from datetime import timezone
 
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone, timedelta
 
 from app.db.models import MessageEnvelope
 from app.db.repositories.message_repository import MessageRepository
@@ -36,6 +36,30 @@ class MessageService:
             cipher_summary["preview"],
         )
 
+        sent_at = request.sentAt
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+        else:
+            sent_at = sent_at.astimezone(timezone.utc)
+
+        expires_at = request.expiresAt
+        if expires_at is not None:
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            else:
+                expires_at = expires_at.astimezone(timezone.utc)
+
+            now = datetime.now(timezone.utc)
+
+            if expires_at <= sent_at:
+                raise ValueError("expires_at_must_be_after_sent_at")
+
+            if expires_at <= now:
+                raise ValueError("message_already_expired")
+            max_expiry = sent_at + timedelta(days=30)
+            if expires_at > max_expiry:
+                raise ValueError("expires_at_too_far_in_future")
+
         envelope = MessageEnvelope(
             id=str(request.messageID),
             sender_user_id=sender_user_id,
@@ -43,9 +67,9 @@ class MessageService:
             conversation_id=str(request.conversationID),
             ciphertext=request.ciphertext,
             header=request.header,
-            created_at=request.sentAt,
+            created_at=sent_at,
             acknowledged=False,
-            expiry_at=request.expiresAt,
+            expiry_at=expires_at,
         )
 
         created = self.repo.create(envelope)

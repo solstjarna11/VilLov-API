@@ -41,7 +41,7 @@ class CiphertextEnvelope(BaseModel):
         return value.isoformat().replace("+00:00", "Z")
     
     @field_serializer("expiresAt")
-    def serialize_created_at(self, value: datetime | None, _info):
+    def serialize_expires_at(self, value: datetime | None, _info):
         if value is None:
             return None
         if value.tzinfo is None:
