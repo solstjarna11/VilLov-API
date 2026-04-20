@@ -14,6 +14,7 @@ class RecipientKeyBundle(BaseModel):
     userID: str
     identityKey: str
     identityAgreementKey: str
+    signedPrekeyId: str
     signedPrekey: str
     signedPrekeySignature: str
     oneTimePrekey: Optional[str] = None
@@ -24,6 +25,7 @@ class UploadKeysRequest(BaseModel):
     userID: str
     identityKey: str
     identityAgreementKey: str
+    signedPrekeyId: str
     signedPrekey: str
     signedPrekeySignature: str
 

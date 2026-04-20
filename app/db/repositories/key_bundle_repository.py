@@ -20,6 +20,7 @@ class KeyBundleRepository:
         user_id: str,
         identity_key: str,
         identity_agreement_key: str,
+        signed_prekey_id: str,
         signed_prekey: str,
         signed_prekey_signature: str,
         one_time_prekey: str | None,
@@ -30,6 +31,7 @@ class KeyBundleRepository:
                 user_id=user_id,
                 identity_key=identity_key,
                 identity_agreement_key=identity_agreement_key,
+                signed_prekey_id=signed_prekey_id,
                 signed_prekey=signed_prekey,
                 signed_prekey_signature=signed_prekey_signature,
                 one_time_prekey=one_time_prekey,
@@ -38,6 +40,7 @@ class KeyBundleRepository:
         else:
             bundle.identity_key = identity_key
             bundle.identity_agreement_key = identity_agreement_key
+            bundle.signed_prekey_id = signed_prekey_id
             bundle.signed_prekey = signed_prekey
             bundle.signed_prekey_signature = signed_prekey_signature
             # Keep legacy compatibility behavior only.
