@@ -20,6 +20,10 @@ class MessageAckRequest(BaseModel):
     messageID: UUID
 
 
+class MessageDeleteRequest(BaseModel):
+    messageID: UUID
+
+
 class CiphertextEnvelope(BaseModel):
     id: UUID = Field(...)
     senderUserID: str
@@ -30,16 +34,14 @@ class CiphertextEnvelope(BaseModel):
     createdAt: datetime
     expiresAt: datetime | None = None
 
-
     @field_serializer("createdAt")
     def serialize_created_at(self, value: datetime, _info):
         if value.tzinfo is None:
             value = value.replace(tzinfo=timezone.utc)
         else:
             value = value.astimezone(timezone.utc)
-
         return value.isoformat().replace("+00:00", "Z")
-    
+
     @field_serializer("expiresAt")
     def serialize_expires_at(self, value: datetime | None, _info):
         if value is None:
@@ -48,7 +50,6 @@ class CiphertextEnvelope(BaseModel):
             value = value.replace(tzinfo=timezone.utc)
         else:
             value = value.astimezone(timezone.utc)
-
         return value.isoformat().replace("+00:00", "Z")
 
 
@@ -59,4 +60,9 @@ class SendCiphertextResponse(BaseModel):
 
 class MessageAckResponse(BaseModel):
     acknowledged: bool
+    messageID: UUID
+
+
+class MessageDeleteResponse(BaseModel):
+    deleted: bool
     messageID: UUID

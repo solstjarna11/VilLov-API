@@ -11,6 +11,8 @@ from app.schemas.messages import (
     CiphertextEnvelope,
     MessageAckRequest,
     MessageAckResponse,
+    MessageDeleteRequest,
+    MessageDeleteResponse,
     SendCiphertextRequest,
     SendCiphertextResponse,
 )
@@ -117,3 +119,29 @@ def acknowledge_message(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
     except PermissionError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot acknowledge this message")
+    
+@router.post("/delete", response_model=MessageDeleteResponse)
+def delete_message(
+    request: MessageDeleteRequest,
+    principal: AuthenticatedPrincipal = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MessageDeleteResponse:
+    logger.info(
+        "message delete requester=%s message_id=%s session_id=%s",
+        principal.user_id,
+        request.messageID,
+        principal.session_id,
+    )
+
+    service = MessageService(db)
+    try:
+        return service.delete(principal.user_id, request)
+    except ValueError as exc:
+        detail = str(exc)
+        if detail == "message_not_found":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+        if detail == "message_already_delivered":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Message already delivered")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+    except PermissionError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete this message")

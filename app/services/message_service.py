@@ -11,6 +11,8 @@ from app.schemas.messages import (
     CiphertextEnvelope,
     MessageAckRequest,
     MessageAckResponse,
+    MessageDeleteRequest,
+    MessageDeleteResponse,
     SendCiphertextRequest,
     SendCiphertextResponse,
 )
@@ -158,4 +160,45 @@ class MessageService:
             header=envelope.header,
             createdAt=created_at,
             expiresAt=expiry_at,
+        )
+    
+    def delete(self, requester_user_id: str, request: MessageDeleteRequest) -> MessageDeleteResponse:
+        logger.info(
+            "message service delete requester=%s message_id=%s",
+            requester_user_id,
+            request.messageID,
+        )
+
+        envelope = self.repo.get(str(request.messageID))
+        if envelope is None:
+            logger.warning(
+                "message service delete missing requester=%s message_id=%s",
+                requester_user_id,
+                request.messageID,
+            )
+            raise ValueError("message_not_found")
+
+        if envelope.sender_user_id != requester_user_id:
+            logger.warning(
+                "message service delete forbidden requester=%s sender=%s message_id=%s",
+                requester_user_id,
+                envelope.sender_user_id,
+                request.messageID,
+            )
+            raise PermissionError("not_sender")
+
+        if envelope.acknowledged:
+            logger.warning(
+                "message service delete rejected requester=%s message_id=%s acknowledged=%s",
+                requester_user_id,
+                request.messageID,
+                envelope.acknowledged,
+            )
+            raise ValueError("message_already_delivered")
+
+        deleted = self.repo.delete(str(request.messageID))
+
+        return MessageDeleteResponse(
+            deleted=deleted,
+            messageID=request.messageID,
         )
