@@ -129,3 +129,24 @@ class MessageRepository:
             envelope.recipient_user_id,
             envelope.acknowledged,
         )
+        
+    def delete(self, message_id: str) -> bool:
+        envelope = self.db.get(MessageEnvelope, message_id)
+        if envelope is None:
+            logger.info("message repository delete message_id=%s found=%s", message_id, False)
+            return False
+
+        logger.info(
+            "message repository delete message_id=%s sender=%s recipient=%s acknowledged=%s",
+            envelope.id,
+            envelope.sender_user_id,
+            envelope.recipient_user_id,
+            envelope.acknowledged,
+        )
+
+        self.db.delete(envelope)
+        self.db.commit()
+
+        logger.info("message repository deleted message_id=%s", message_id)
+        return True
+    
