@@ -18,7 +18,7 @@ from app.schemas.auth import (
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 @router.post("/passkey/register/begin", response_model=PasskeyRegistrationBeginResponse)
@@ -26,12 +26,12 @@ def passkey_register_begin(
     request: PasskeyBeginRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> PasskeyRegistrationBeginResponse:
-    logger.info(
-        "auth register begin requested user_handle=%s device_id=%s display_name=%s",
-        request.userHandle,
-        request.deviceID,
-        request.displayName,
-    )
+    # logger.info(
+    #     "auth register begin requested user_handle=%s device_id=%s display_name=%s",
+    #     request.userHandle,
+    #     request.deviceID,
+    #     request.displayName,
+    # )
     return AuthService(db).begin_register_passkey(
         user_id=request.userHandle,
         device_id=request.deviceID,
@@ -44,12 +44,12 @@ def passkey_register_finish(
     request: PasskeyRegistrationFinishRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> SessionToken:
-    logger.info(
-        "auth register finish requested user_handle=%s credential_id=%s device_id=%s",
-        request.userHandle,
-        request.credentialID,
-        request.deviceID,
-    )
+    # logger.info(
+    #     "auth register finish requested user_handle=%s credential_id=%s device_id=%s",
+    #     request.userHandle,
+    #     request.credentialID,
+    #     request.deviceID,
+    # )
     return AuthService(db).finish_register_passkey(request)
 
 
@@ -58,11 +58,11 @@ def passkey_login_begin(
     request: PasskeyBeginRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> PasskeyAssertionBeginResponse:
-    logger.info(
-        "auth login begin requested user_handle=%s device_id=%s",
-        request.userHandle,
-        request.deviceID,
-    )
+    # logger.info(
+    #     "auth login begin requested user_handle=%s device_id=%s",
+    #     request.userHandle,
+    #     request.deviceID,
+    # )
     return AuthService(db).begin_login_passkey(
         user_id=request.userHandle,
         device_id=request.deviceID,
@@ -74,12 +74,12 @@ def passkey_login_finish(
     request: PasskeyAssertionFinishRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> SessionToken:
-    logger.info(
-        "auth login finish requested user_handle=%s credential_id=%s device_id=%s",
-        request.userHandle,
-        request.credentialID,
-        request.deviceID,
-    )
+    # logger.info(
+    #     "auth login finish requested user_handle=%s credential_id=%s device_id=%s",
+    #     request.userHandle,
+    #     request.credentialID,
+    #     request.deviceID,
+    # )
     return AuthService(db).finish_login_passkey(request)
 
 
@@ -88,11 +88,11 @@ def passkey_begin(
     request: PasskeyBeginRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> PasskeyAssertionBeginResponse:
-    logger.info(
-        "legacy passkey begin requested user_handle=%s device_id=%s",
-        request.userHandle,
-        request.deviceID,
-    )
+    # logger.info(
+    #     "legacy passkey begin requested user_handle=%s device_id=%s",
+    #     request.userHandle,
+    #     request.deviceID,
+    # )
     return AuthService(db).begin_login_passkey(
         user_id=request.userHandle,
         device_id=request.deviceID,
@@ -104,10 +104,10 @@ def passkey_finish(
     request: PasskeyAssertionFinishRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> SessionToken:
-    logger.info(
-        "legacy passkey finish requested user_handle=%s credential_id=%s device_id=%s",
-        request.userHandle,
-        request.credentialID,
-        request.deviceID,
-    )
+    # logger.info(
+    #     "legacy passkey finish requested user_handle=%s credential_id=%s device_id=%s",
+    #     request.userHandle,
+    #     request.credentialID,
+    #     request.deviceID,
+    # )
     return AuthService(db).finish_login_passkey(request)

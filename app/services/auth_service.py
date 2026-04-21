@@ -47,7 +47,7 @@ from app.schemas.auth import (
     SessionToken,
 )
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -178,13 +178,13 @@ class AuthService:
                 credential.credential_id
             )
             if credential_id_bytes is None:
-                logger.warning(
-                    "Skipping malformed credential_id during login begin "
-                    "for user_id=%s passkey_credential_id=%s stored_credential_id=%r",
-                    user.user_id,
-                    credential.id,
-                    credential.credential_id,
-                )
+                # logger.warning(
+                #     "Skipping malformed credential_id during login begin "
+                #     "for user_id=%s passkey_credential_id=%s stored_credential_id=%r",
+                #     user.user_id,
+                #     credential.id,
+                #     credential.credential_id,
+                # )
                 continue
 
             allow_credentials.append(
@@ -296,10 +296,10 @@ class AuthService:
             if not ENABLE_DEVELOPMENT_PASSKEY_AUTH:
                 raise ValueError(f"registration_verification_failed:{exc}") from exc
 
-            logger.warning(
-                "Strict WebAuthn registration failed, falling back to development verification: %s",
-                exc,
-            )
+            # logger.warning(
+            #     "Strict WebAuthn registration failed, falling back to development verification: %s",
+            #     exc,
+            # )
             return self._verify_development_registration(request)
 
     def _verify_authentication(
@@ -334,10 +334,10 @@ class AuthService:
             if not ENABLE_DEVELOPMENT_PASSKEY_AUTH:
                 raise ValueError(f"authentication_verification_failed:{exc}") from exc
 
-            logger.warning(
-                "Strict WebAuthn authentication failed, falling back to development verification: %s",
-                exc,
-            )
+            # logger.warning(
+            #     "Strict WebAuthn authentication failed, falling back to development verification: %s",
+            #     exc,
+            # )
             return self._verify_development_authentication(
                 request=request,
                 credential=credential,

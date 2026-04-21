@@ -18,7 +18,7 @@ from app.schemas.messages import (
 )
 from app.utils.logging_helper import summarize_ciphertext
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 class MessageService:
@@ -27,16 +27,16 @@ class MessageService:
 
     def send(self, sender_user_id: str, request: SendCiphertextRequest) -> SendCiphertextResponse:
         cipher_summary = summarize_ciphertext(request.ciphertext)
-        logger.info(
-            "message service store sender=%s recipient=%s conversation_id=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s",
-            sender_user_id,
-            request.recipientUserID,
-            request.conversationID,
-            request.messageID,
-            cipher_summary["type"],
-            cipher_summary["length"],
-            cipher_summary["preview"],
-        )
+        # logger.info(
+        #     "message service store sender=%s recipient=%s conversation_id=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s",
+        #     sender_user_id,
+        #     request.recipientUserID,
+        #     request.conversationID,
+        #     request.messageID,
+        #     cipher_summary["type"],
+        #     cipher_summary["length"],
+        #     cipher_summary["preview"],
+        # )
 
         sent_at = request.sentAt
         if sent_at.tzinfo is None:
@@ -78,54 +78,54 @@ class MessageService:
         created = self.repo.create(envelope)
 
         stored_summary = summarize_ciphertext(created.ciphertext)
-        logger.info(
-            "message service stored sender=%s recipient=%s conversation_id=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s acknowledged=%s",
-            created.sender_user_id,
-            created.recipient_user_id,
-            created.conversation_id,
-            created.id,
-            stored_summary["type"],
-            stored_summary["length"],
-            stored_summary["preview"],
-            created.acknowledged,
-        )
+        # logger.info(
+        #     "message service stored sender=%s recipient=%s conversation_id=%s message_id=%s ciphertext_type=%s ciphertext_len=%s ciphertext_preview=%s acknowledged=%s",
+        #     created.sender_user_id,
+        #     created.recipient_user_id,
+        #     created.conversation_id,
+        #     created.id,
+        #     stored_summary["type"],
+        #     stored_summary["length"],
+        #     stored_summary["preview"],
+        #     created.acknowledged,
+        # )
 
         return SendCiphertextResponse(accepted=True, envelope=self._to_schema(created))
 
     def inbox(self, recipient_user_id: str) -> list[CiphertextEnvelope]:
         envelopes = self.repo.inbox_for_user(recipient_user_id)
 
-        logger.info(
-            "message service inbox recipient=%s count=%s",
-            recipient_user_id,
-            len(envelopes),
-        )
+        # logger.info(
+        #     "message service inbox recipient=%s count=%s",
+        #     recipient_user_id,
+        #     len(envelopes),
+        # )
 
         return [self._to_schema(item) for item in envelopes]
 
     def acknowledge(self, recipient_user_id: str, request: MessageAckRequest) -> MessageAckResponse:
-        logger.info(
-            "message service acknowledge recipient=%s message_id=%s",
-            recipient_user_id,
-            request.messageID,
-        )
+        # logger.info(
+        #     "message service acknowledge recipient=%s message_id=%s",
+        #     recipient_user_id,
+        #     request.messageID,
+        # )
 
         envelope = self.repo.get(str(request.messageID))
         if envelope is None:
-            logger.warning(
-                "message service acknowledge missing recipient=%s message_id=%s",
-                recipient_user_id,
-                request.messageID,
-            )
+            # logger.warning(
+            #     "message service acknowledge missing recipient=%s message_id=%s",
+            #     recipient_user_id,
+            #     request.messageID,
+            # )
             raise ValueError("message_not_found")
 
         if envelope.recipient_user_id != recipient_user_id:
-            logger.warning(
-                "message service acknowledge forbidden recipient=%s actual_recipient=%s message_id=%s",
-                recipient_user_id,
-                envelope.recipient_user_id,
-                request.messageID,
-            )
+            # logger.warning(
+            #     "message service acknowledge forbidden recipient=%s actual_recipient=%s message_id=%s",
+            #     recipient_user_id,
+            #     envelope.recipient_user_id,
+            #     request.messageID,
+            # )
             raise PermissionError("not_recipient")
 
         updated = self.repo.acknowledge_for_recipient(
@@ -133,54 +133,54 @@ class MessageService:
             recipient_user_id,
         )
 
-        if not updated:
+        # if not updated:
             # Covers already-acknowledged or concurrent state change.
-            logger.info(
-                "message service acknowledge no-op recipient=%s message_id=%s",
-                recipient_user_id,
-                request.messageID,
-            )
+            # logger.info(
+            #     "message service acknowledge no-op recipient=%s message_id=%s",
+            #     recipient_user_id,
+            #     request.messageID,
+            # )
 
-        logger.info(
-            "message service acknowledged recipient=%s message_id=%s",
-            recipient_user_id,
-            request.messageID,
-        )
+        # logger.info(
+        #     "message service acknowledged recipient=%s message_id=%s",
+        #     recipient_user_id,
+        #     request.messageID,
+        # )
 
         return MessageAckResponse(acknowledged=True, messageID=request.messageID)
 
     def delete(self, requester_user_id: str, request: MessageDeleteRequest) -> MessageDeleteResponse:
-        logger.info(
-            "message service delete requester=%s message_id=%s",
-            requester_user_id,
-            request.messageID,
-        )
+        # logger.info(
+        #     "message service delete requester=%s message_id=%s",
+        #     requester_user_id,
+        #     request.messageID,
+        # )
 
         envelope = self.repo.get(str(request.messageID))
         if envelope is None:
-            logger.warning(
-                "message service delete missing requester=%s message_id=%s",
-                requester_user_id,
-                request.messageID,
-            )
+            # logger.warning(
+            #     "message service delete missing requester=%s message_id=%s",
+            #     requester_user_id,
+            #     request.messageID,
+            # )
             raise ValueError("message_not_found")
 
         if envelope.sender_user_id != requester_user_id:
-            logger.warning(
-                "message service delete forbidden requester=%s sender=%s message_id=%s",
-                requester_user_id,
-                envelope.sender_user_id,
-                request.messageID,
-            )
+            # logger.warning(
+            #     "message service delete forbidden requester=%s sender=%s message_id=%s",
+            #     requester_user_id,
+            #     envelope.sender_user_id,
+            #     request.messageID,
+            # )
             raise PermissionError("not_sender")
 
         if envelope.acknowledged:
-            logger.warning(
-                "message service delete rejected requester=%s message_id=%s acknowledged=%s",
-                requester_user_id,
-                request.messageID,
-                envelope.acknowledged,
-            )
+            # logger.warning(
+            #     "message service delete rejected requester=%s message_id=%s acknowledged=%s",
+            #     requester_user_id,
+            #     request.messageID,
+            #     envelope.acknowledged,
+            # )
             raise ValueError("message_already_delivered")
 
         deleted = self.repo.delete_for_sender_if_undelivered(
@@ -190,11 +190,11 @@ class MessageService:
 
         if not deleted:
             # Covers a concurrent ack/delete after the earlier read.
-            logger.warning(
-                "message service delete no-op requester=%s message_id=%s",
-                requester_user_id,
-                request.messageID,
-            )
+            # logger.warning(
+            #     "message service delete no-op requester=%s message_id=%s",
+            #     requester_user_id,
+            #     request.messageID,
+            # )
             raise ValueError("message_already_delivered")
 
         return MessageDeleteResponse(

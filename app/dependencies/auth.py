@@ -12,7 +12,7 @@ from app.db.repositories.auth_repository import AuthRepository
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 @dataclass
 class AuthenticatedPrincipal:
