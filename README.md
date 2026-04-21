@@ -15,7 +15,7 @@ Implemented:
 - inbox fetch
 - message acknowledgement
 - contacts and conversation directory APIs
-- SQLite backed persistence layer
+- PostgreSQL backed persistence layer
 - end-to-end cryptography
 
 
@@ -29,7 +29,7 @@ Deliberately not implemented yet:
 
 - FastAPI
 - SQLAlchemy
-- SQLite
+- PostgreSQL
 
 ## Project layout
 
