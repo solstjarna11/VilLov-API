@@ -22,6 +22,7 @@ engine_kwargs: dict = {
 if IS_SQLITE:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
 
+print(f"[DB] Using database: {DATABASE_URL}")
 engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(
