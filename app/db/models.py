@@ -129,4 +129,7 @@ class MessageEnvelope(Base):
     ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
     header: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    expiry_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True,
+    )
     acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)

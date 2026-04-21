@@ -55,15 +55,10 @@ def upload_keys(
     principal: AuthenticatedPrincipal = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RecipientKeyBundle:
-    if request.userID != principal.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot upload keys for another user",
-        )
 
     logger.info(
         "key bundle upload user_id=%s session_id=%s has_identity_key=%s has_identity_agreement_key=%s has_signed_prekey=%s one_time_prekeys_count=%s has_legacy_one_time_prekey=%s",
-        request.userID,
+        principal.user_id,
         principal.session_id,
         bool(request.identityKey),
         bool(request.identityAgreementKey),
@@ -72,11 +67,11 @@ def upload_keys(
         bool(request.oneTimePrekey),
     )
 
-    bundle = KeyService(db).upload_keys(request)
+    bundle = KeyService(db).upload_keys(principal.user_id, request)
 
     logger.info(
         "key bundle upload stored user_id=%s session_id=%s has_identity_key=%s has_identity_agreement_key=%s has_signed_prekey=%s",
-        request.userID,
+        principal.user_id,
         principal.session_id,
         bool(bundle.identityKey),
         bool(bundle.identityAgreementKey),

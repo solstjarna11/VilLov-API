@@ -32,11 +32,11 @@ class KeyService:
             oneTimePrekeyId=consumed_opk.id if consumed_opk else None,
         )
 
-    def upload_keys(self, request: UploadKeysRequest) -> RecipientKeyBundle:
+    def upload_keys(self, user_id: str, request: UploadKeysRequest) -> RecipientKeyBundle:
         legacy_one_time_prekey = request.oneTimePrekey
 
         bundle = self.repo.upsert(
-            user_id=request.userID,
+            user_id=user_id,
             identity_key=request.identityKey,
             identity_agreement_key=request.identityAgreementKey,
             signed_prekey_id=request.signedPrekeyId,
@@ -47,7 +47,7 @@ class KeyService:
 
         if request.oneTimePrekeys:
             self.repo.create_one_time_prekeys(
-                user_id=request.userID,
+                user_id=user_id,
                 prekeys=[(item.id, item.publicKey) for item in request.oneTimePrekeys],
             )
 

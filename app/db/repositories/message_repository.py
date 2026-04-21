@@ -2,7 +2,8 @@
 
 import logging
 
-from sqlalchemy import select
+from datetime import datetime, UTC
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 
 from app.db.models import MessageEnvelope
@@ -53,11 +54,14 @@ class MessageRepository:
             recipient_user_id,
         )
 
+        now = datetime.now(UTC)
+
         stmt = (
             select(MessageEnvelope)
             .where(
                 MessageEnvelope.recipient_user_id == recipient_user_id,
                 MessageEnvelope.acknowledged.is_(False),
+                or_(MessageEnvelope.expiry_at.is_(None), MessageEnvelope.expiry_at > now,),
             )
             .order_by(MessageEnvelope.created_at.asc())
         )
