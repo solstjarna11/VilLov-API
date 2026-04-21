@@ -86,7 +86,7 @@ class AuthService:
         self._store_challenge(
             challenge=challenge,
             user_id=user.user_id,
-            device_id=device_id,
+            device_id=None,
             flow_type="register",
         )
 

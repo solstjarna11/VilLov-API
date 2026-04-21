@@ -1,9 +1,9 @@
 # app/db/repositories/message_repository.py
 
 import logging
+from datetime import UTC, datetime
 
-from datetime import datetime, UTC
-from sqlalchemy import select, or_
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import MessageEnvelope
@@ -61,7 +61,10 @@ class MessageRepository:
             .where(
                 MessageEnvelope.recipient_user_id == recipient_user_id,
                 MessageEnvelope.acknowledged.is_(False),
-                or_(MessageEnvelope.expiry_at.is_(None), MessageEnvelope.expiry_at > now,),
+                or_(
+                    MessageEnvelope.expiry_at.is_(None),
+                    MessageEnvelope.expiry_at > now,
+                ),
             )
             .order_by(MessageEnvelope.created_at.asc())
         )
@@ -107,46 +110,63 @@ class MessageRepository:
 
         return envelope
 
-    def acknowledge(self, message_id: str) -> None:
-        envelope = self.db.get(MessageEnvelope, message_id)
-        if envelope is None:
-            logger.info("message repository acknowledge message_id=%s found=%s", message_id, False)
-            return
-
+    def acknowledge_for_recipient(self, message_id: str, recipient_user_id: str) -> bool:
         logger.info(
-            "message repository acknowledge message_id=%s recipient=%s current_acknowledged=%s",
+            "message repository acknowledge attempt message_id=%s recipient=%s",
             message_id,
-            envelope.recipient_user_id,
-            envelope.acknowledged,
+            recipient_user_id,
         )
 
-        envelope.acknowledged = True
+        stmt = (
+            update(MessageEnvelope)
+            .where(
+                MessageEnvelope.id == message_id,
+                MessageEnvelope.recipient_user_id == recipient_user_id,
+                MessageEnvelope.acknowledged.is_(False),
+            )
+            .values(acknowledged=True)
+        )
+
+        result = self.db.execute(stmt)
         self.db.commit()
 
+        updated = result.rowcount > 0
+
         logger.info(
-            "message repository acknowledged message_id=%s recipient=%s current_acknowledged=%s",
+            "message repository acknowledge result message_id=%s recipient=%s updated=%s",
             message_id,
-            envelope.recipient_user_id,
-            envelope.acknowledged,
+            recipient_user_id,
+            updated,
         )
-        
-    def delete(self, message_id: str) -> bool:
-        envelope = self.db.get(MessageEnvelope, message_id)
-        if envelope is None:
-            logger.info("message repository delete message_id=%s found=%s", message_id, False)
-            return False
 
+        return updated
+
+    def delete_for_sender_if_undelivered(self, message_id: str, sender_user_id: str) -> bool:
         logger.info(
-            "message repository delete message_id=%s sender=%s recipient=%s acknowledged=%s",
-            envelope.id,
-            envelope.sender_user_id,
-            envelope.recipient_user_id,
-            envelope.acknowledged,
+            "message repository delete attempt message_id=%s sender=%s",
+            message_id,
+            sender_user_id,
         )
 
-        self.db.delete(envelope)
+        stmt = (
+            delete(MessageEnvelope)
+            .where(
+                MessageEnvelope.id == message_id,
+                MessageEnvelope.sender_user_id == sender_user_id,
+                MessageEnvelope.acknowledged.is_(False),
+            )
+        )
+
+        result = self.db.execute(stmt)
         self.db.commit()
 
-        logger.info("message repository deleted message_id=%s", message_id)
-        return True
-    
+        deleted = result.rowcount > 0
+
+        logger.info(
+            "message repository delete result message_id=%s sender=%s deleted=%s",
+            message_id,
+            sender_user_id,
+            deleted,
+        )
+
+        return deleted
