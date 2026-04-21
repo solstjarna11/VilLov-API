@@ -1,9 +1,9 @@
 # app/services/message_service.py
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone, timedelta
 
 from app.db.models import MessageEnvelope
 from app.db.repositories.message_repository import MessageRepository
@@ -58,6 +58,7 @@ class MessageService:
 
             if expires_at <= now:
                 raise ValueError("message_already_expired")
+
             max_expiry = sent_at + timedelta(days=30)
             if expires_at > max_expiry:
                 raise ValueError("expires_at_too_far_in_future")
@@ -127,7 +128,18 @@ class MessageService:
             )
             raise PermissionError("not_recipient")
 
-        self.repo.acknowledge(str(request.messageID))
+        updated = self.repo.acknowledge_for_recipient(
+            str(request.messageID),
+            recipient_user_id,
+        )
+
+        if not updated:
+            # Covers already-acknowledged or concurrent state change.
+            logger.info(
+                "message service acknowledge no-op recipient=%s message_id=%s",
+                recipient_user_id,
+                request.messageID,
+            )
 
         logger.info(
             "message service acknowledged recipient=%s message_id=%s",
@@ -137,31 +149,6 @@ class MessageService:
 
         return MessageAckResponse(acknowledged=True, messageID=request.messageID)
 
-    @staticmethod
-    def _to_schema(envelope: MessageEnvelope) -> CiphertextEnvelope:
-        created_at = envelope.created_at
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        else:
-            created_at = created_at.astimezone(timezone.utc)
-        expiry_at=envelope.expiry_at
-        if expiry_at is not None:
-            if expiry_at.tzinfo is None:
-                expiry_at=expiry_at.replace(tzinfo=timezone.utc)
-            else:
-                expiry_at=expiry_at.astimezone(timezone.utc)
-
-        return CiphertextEnvelope(
-            id=envelope.id,
-            senderUserID=envelope.sender_user_id,
-            recipientUserID=envelope.recipient_user_id,
-            conversationID=envelope.conversation_id,
-            ciphertext=envelope.ciphertext,
-            header=envelope.header,
-            createdAt=created_at,
-            expiresAt=expiry_at,
-        )
-    
     def delete(self, requester_user_id: str, request: MessageDeleteRequest) -> MessageDeleteResponse:
         logger.info(
             "message service delete requester=%s message_id=%s",
@@ -196,9 +183,47 @@ class MessageService:
             )
             raise ValueError("message_already_delivered")
 
-        deleted = self.repo.delete(str(request.messageID))
+        deleted = self.repo.delete_for_sender_if_undelivered(
+            str(request.messageID),
+            requester_user_id,
+        )
+
+        if not deleted:
+            # Covers a concurrent ack/delete after the earlier read.
+            logger.warning(
+                "message service delete no-op requester=%s message_id=%s",
+                requester_user_id,
+                request.messageID,
+            )
+            raise ValueError("message_already_delivered")
 
         return MessageDeleteResponse(
             deleted=deleted,
             messageID=request.messageID,
+        )
+
+    @staticmethod
+    def _to_schema(envelope: MessageEnvelope) -> CiphertextEnvelope:
+        created_at = envelope.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        else:
+            created_at = created_at.astimezone(timezone.utc)
+
+        expiry_at = envelope.expiry_at
+        if expiry_at is not None:
+            if expiry_at.tzinfo is None:
+                expiry_at = expiry_at.replace(tzinfo=timezone.utc)
+            else:
+                expiry_at = expiry_at.astimezone(timezone.utc)
+
+        return CiphertextEnvelope(
+            id=envelope.id,
+            senderUserID=envelope.sender_user_id,
+            recipientUserID=envelope.recipient_user_id,
+            conversationID=envelope.conversation_id,
+            ciphertext=envelope.ciphertext,
+            header=envelope.header,
+            createdAt=created_at,
+            expiresAt=expiry_at,
         )
