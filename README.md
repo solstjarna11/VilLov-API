@@ -1,6 +1,6 @@
-# VilLov Chat Dev Backend
+# VilLov Chat Backend
 
-Minimal FastAPI backend for the current VilLov Chat client stage.
+FastAPI backend for the  VilLov messaging application.
 
 ## Scope
 
@@ -15,11 +15,12 @@ Implemented:
 - inbox fetch
 - message acknowledgement
 - contacts and conversation directory APIs
-- seeded SQLite persistence
+- SQLite backed persistence layer
+- end-to-end cryptography
+
 
 Deliberately not implemented yet:
 
-- real end-to-end cryptography
 - real device linking
 - production JWT/session handling
 - disappearing message enforcement
@@ -47,27 +48,14 @@ villov-backend/
 └── villov_dev.db
 ```
 
-## Run locally
+## Deployment
 
-```bash
-cd villov-API
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Default base URL:
+Production base URL:
 
 ```text
 auth.villovchat.com
 ```
 
-## Known development tokens
-
-- `dev-token-user_alice`
-- `dev-token-user_bob`
-- `dev-token-user_charlie`
 
 ## Auth behavior
 
@@ -146,123 +134,26 @@ The server never:
 - `POST /messages/send`
 - `GET /messages/inbox`
 - `POST /messages/ack`
+- `POST /messages/delete`
 
 ### Misc
 
 - `GET /health`
 
-## Example requests
+## Client integration flow
 
-### Begin login (Bob)
+The deployed iOS client uses the backend in the following order:
 
-```bash
-curl -X POST http://127.0.0.1:8000/auth/passkey/login/begin \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "userHandle": "user_bob",
-    "deviceID": "device-user_bob-iphone"
-  }'
-```
+1. Register or log in with the passkey flow
+2. Upload the device’s public key bundle
+3. Fetch contacts and existing conversations
+4. Get or create a conversation with another user
+5. Fetch the recipient public key bundle
+6. Encrypt messages locally on-device
+7. Send only ciphertext and metadata to the backend
+8. Fetch inbox messages and decrypt locally on-device
 
-### Finish login
 
-```bash
-curl -X POST http://127.0.0.1:8000/auth/passkey/login/finish \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "credentialID": "credential-user_bob-primary",
-    "clientDataJSON": "stub-client-data",
-    "authenticatorData": "stub-auth-data",
-    "signature": "stub-signature",
-    "userHandle": "user_bob",
-    "deviceID": "device-user_bob-iphone"
-  }'
-```
-
-### Fetch contacts
-
-```bash
-curl http://127.0.0.1:8000/contacts \
-  -H 'Authorization: Bearer dev-token-user_alice'
-```
-
-### Fetch conversations
-
-```bash
-curl http://127.0.0.1:8000/conversations \
-  -H 'Authorization: Bearer dev-token-user_alice'
-```
-
-Example response:
-
-```json
-[
-  {
-    "conversationID": "c31d58bf-ab98-4c75-8c82-900def70c8af",
-    "participantAUserID": "user_alice",
-    "participantBUserID": "user_bob",
-    "createdAt": "2026-04-12T22:21:09.043405Z"
-  }
-]
-```
-
-### Get or create conversation
-
-```bash
-curl -X POST http://127.0.0.1:8000/conversations/get-or-create \
-  -H "Authorization: Bearer dev-token-user_alice" \
-  -H "Content-Type: application/json" \
-  -d '{"recipientUserID":"user_bob"}'
-```
-
-Response:
-
-```json
-{
-  "conversationID": "<uuid>"
-}
-```
-
-### Fetch Bob's key bundle
-
-```bash
-curl http://127.0.0.1:8000/keys/user_bob/bundle \
-  -H 'Authorization: Bearer dev-token-user_alice'
-```
-
-### Send ciphertext to Bob
-
-```bash
-curl -X POST http://127.0.0.1:8000/messages/send \
-  -H 'Authorization: Bearer dev-token-user_alice' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "recipientUserID": "user_bob",
-    "messageID": "11111111-1111-1111-1111-111111111111",
-    "conversationID": "22222222-2222-2222-2222-222222222222",
-    "ciphertext": "stub-ciphertext",
-    "header": "stub-header",
-    "sentAt": "2026-03-26T12:00:00Z"
-  }'
-```
-
-### Fetch inbox
-
-```bash
-curl http://127.0.0.1:8000/messages/inbox \
-  -H 'Authorization: Bearer dev-token-user_bob'
-```
-
-### Acknowledge message
-
-```bash
-curl -X POST http://127.0.0.1:8000/messages/ack \
-  -H 'Authorization: Bearer dev-token-user_bob' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "messageID": "11111111-1111-1111-1111-111111111111"
-  }'
-```
 
 ## Notes for the Swift client
 
