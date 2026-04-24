@@ -153,8 +153,6 @@ Must be disabled in production.
 
 - Disable dev passkey by default  
 - Require user verification in WebAuthn  
-- Hash session tokens in database  
-- Remove `.env` secrets from repository  
 
 ### Metadata Exposure
 
@@ -189,9 +187,18 @@ uvicorn main:app --reload
 ### Environment Variables
 
 ```env
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql://villov_api_postgres...
+WEBAUTHN_RP_ID=auth.villovchat.com
+WEBAUTHN_ORIGIN=https://auth.villovchat.com
+WEBAUTHN_RP_NAME=VilLov Chat
 ENABLE_DEVELOPMENT_PASSKEY_AUTH=true
-SECRET_KEY=...
+RUN_DB_CREATE_ALL=true
+ALLOWED_HOSTS=villov-api.onrender.com,auth.villovchat.com
+API_TITLE=VilLov Chat Dev Backend
+API_VERSION=0.1.2
+TOKEN_TTL_DAYS=30
+CHALLENGE_TTL_MINUTES=5
+SESSION_TOKEN_HASH_SECRET = ...
 ```
 
 ---
