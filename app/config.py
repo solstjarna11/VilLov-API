@@ -22,6 +22,11 @@ CHALLENGE_TTL_MINUTES = int(os.getenv("CHALLENGE_TTL_MINUTES", "5"))
 ACCESS_TOKEN_EXPIRE_DELTA = timedelta(days=TOKEN_TTL_DAYS)
 CHALLENGE_EXPIRE_DELTA = timedelta(minutes=CHALLENGE_TTL_MINUTES)
 
+SESSION_TOKEN_HASH_SECRET = os.getenv(
+    "SESSION_TOKEN_HASH_SECRET",
+    "dev-only-change-this-session-token-hash-secret",
+)
+
 # Development fallback for passkey auth must be disabled in deployed environments.
 ENABLE_DEVELOPMENT_PASSKEY_AUTH = (
     os.getenv("ENABLE_DEVELOPMENT_PASSKEY_AUTH", "true").strip().lower() == "true"

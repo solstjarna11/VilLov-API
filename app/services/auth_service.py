@@ -5,6 +5,9 @@ import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 
+import hashlib
+import hmac
+
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -33,10 +36,12 @@ from webauthn.helpers.structs import (
 from app.config import (
     CHALLENGE_TTL_MINUTES,
     ENABLE_DEVELOPMENT_PASSKEY_AUTH,
+    SESSION_TOKEN_HASH_SECRET,
     TOKEN_TTL_DAYS,
     WEBAUTHN_ORIGIN,
     WEBAUTHN_RP_ID,
     WEBAUTHN_RP_NAME,
+    
 )
 from app.db.models import AuthChallenge, AuthSession, Device, PasskeyCredential, User
 from app.schemas.auth import (
@@ -602,12 +607,14 @@ class AuthService:
     def _create_session_token(self, user_id: str, device_id: str) -> SessionToken:
         now = self._utc_now()
         expires_at = now + timedelta(days=TOKEN_TTL_DAYS)
-        access_token = secrets.token_urlsafe(32)
+
+        raw_access_token = secrets.token_urlsafe(32)
+        access_token_hash = self._hash_session_token(raw_access_token)
 
         session = AuthSession(
             user_id=user_id,
             device_id=device_id,
-            access_token=access_token,
+            access_token=access_token_hash,
             expires_at=expires_at,
             created_at=now,
             revoked_at=None,
@@ -615,9 +622,17 @@ class AuthService:
         self.db.add(session)
 
         return SessionToken(
-            accessToken=access_token,
+            accessToken=raw_access_token,
             expiresAt=expires_at,
         )
+    
+    @staticmethod
+    def _hash_session_token(raw_token: str) -> str:
+        return hmac.new(
+            SESSION_TOKEN_HASH_SECRET.encode("utf-8"),
+            raw_token.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
 
     @staticmethod
     def _encode_public_key_bytes(public_key: bytes) -> str:

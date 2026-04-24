@@ -1,6 +1,7 @@
 # tests/test_keys_auth_integration.py
 
 from app.db.models import KeyBundle, OneTimePreKey
+from app.db.models import AuthSession
 
 
 def test_authenticated_key_upload_succeeds(client, db_session):
@@ -36,6 +37,10 @@ def test_authenticated_key_upload_succeeds(client, db_session):
     )
     assert len(stored_opks) == 2
     assert all(not row.is_consumed for row in stored_opks)
+    
+    stored_session = db_session.query(AuthSession).first()
+    assert stored_session.access_token != alice["access_token"]
+    assert len(stored_session.access_token) == 64
 
 
 def test_fetch_bundle_for_another_user_returns_bundle_and_consumes_one_opk(client, db_session):
